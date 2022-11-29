@@ -1,0 +1,77 @@
+function initialize_draws!(method::Symbol, draws, gradient, rng, ldg; kwargs...)
+    initialize_draws!(Val{method}(), draws, gradient, rng, ldg; kwargs...)
+end
+
+# TODO will gradient ever be a vector? Do we need this method?
+function initialize_draws!(::Val{:stan}, draws::Array, gradient::Vector,
+                           rng, ldg; kwargs...)
+    chains = size(draws, 3)
+    for chain in 1:chains
+        @views stan_initialize_draw!(draws[1, :, chain], gradient,
+                                     rng, ldg; kwargs...)
+    end
+end
+
+function initialize_draws!(::Val{:stan}, draws::Array, gradients::Matrix,
+                           rng, ldg; kwargs...)
+    chains = size(draws, 3)
+    @assert chains == size(gradients, 2) "Need as many gradients as chains"
+    for chain in 1:chains
+        @views stan_initialize_draw!(draws[1, :, chain], gradients[:, chain],
+                                     rng, ldg; kwargs...)
+    end
+end
+
+function stan_initialize_draw!(position::Vector, gradient::Vector,
+                               ldg, rng; radius = 2, attempts = 100, kwargs...)
+    initialized = false
+    a = 0
+    T = eltype(position)
+    dims = length(position)
+
+    while a < attempts && !initialized
+        position .= radius .* (2 .* rand(rng, T, dims) .- 1)
+        lp = ldg(position, gradient; kwargs...)
+
+        if isfinite(lp) && !isnan(lp)
+            initialized = true
+        end
+
+        g = sum(gradient)
+        if isfinite(g) && !isnan(g)
+            initialized &= true
+        end
+
+        a += 1
+    end
+
+    @assert a <= attempts && initialized "Failed to find inital values in $(attempts) attempts."
+end
+
+function initialize_draws!(::Val{:sga}, draws::Array, gradients::Matrix,
+                           rng, ldg; steps = 100,
+                           initialize_draws_adam = Adam(),
+                           number_threads = Threads.nthreads(),
+                           kwargs...)
+    chains = size(draws, 3)
+    @assert chains == size(gradients, 2) "Need as many gradients as chains"
+    @sync for it in 1:number_threads
+        Threads.@spawn for chain in it:number_threads:chains
+            for s in 1:steps
+                _ = ldg(draws[1, :, chain], gradients[:, chain])
+                draws[1, :, chain] .-= update!(initialize_draws_adam, gradients[:, chain], s)
+            end
+        end
+    end
+end
+
+function initialize_draws!(::Val{:none}, draws::Array, gradients, rng, ldg; kwargs...)
+    if haskey(kwargs, :initial_draw)
+        draws[1, :, :] .= initial_draw
+    else
+        _, dims, chains = size(draws)
+        error("With draws_initializer = :none, " *
+            "supply initial_draw with dimensions $dims by $chains")
+    end
+end
+

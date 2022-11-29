@@ -1,61 +1,140 @@
+abstract type AbstractSampler{T <: AbstractFloat} end
 abstract type AbstractStan{T} <: AbstractSampler{T} end
 
-mutable struct Stan{T <: AbstractFloat} <: AbstractStan
-    metric::Matrix{T}
-    om::OnlineMoments{T}
-    dualaverage_ε::DualAverage{T}
-    const dims::Int
-    const chains::Int
-    const maxtreedepth::Int
-    const maxdeltaH::T
+struct Stan{T} <: AbstractStan{T}
+    metric::VecOrMat{T}
+    stepsize::Vector{T}
+    seed::Vector{Int}
+    dims::Int
+    chains::Int
+    maxtreedepth::Int
+    maxdeltaH::T
 end
 
 function Stan(dims, chains, T = Float64;
               metric = ones(T, dims, chains),
-              ws = OnlineMoments(T, dims, chains),
-              daulaverage_ε = DualAverage(),
+              stepsize = ones(T, chains),
+              seed = [1:chains;],
               maxtreedepth = 10,
-              maxdeltaH = 1000)
+              maxdeltaH = convert(T, 1000))
     return Stan(metric,
-                ws,
-                dualaverage_ε,
+                stepsize,
+                seed,
                 dims,
                 chains,
                 maxtreedepth,
                 maxdeltaH)
 end
 
-function sample(stan::AbstractStan{T}, ldg;
+# TODO the goal is to generalize sample() such that it doesn't need any method specified
+function sample(sampler::AbstractSampler{T}, ldg;
                 iterations = 2000,
                 warmup = div(iteration, 2),
-                rng = Random.Xoshiro(rand(1:typemax(Int))),
-                wa = WindowedAdapter(warmup),
-                diagnostics = (;); # TODO could probably use somesort of
-                # helper function
+                rng = Random.Xoshiro(sampler.seed),
+                draws_initializer = :stan,
+                stepsize_adapter = DualAverage(sampler.chains),
+                trajectory_lengthadapter = (sampler.chains; initializer = :stan),
+                metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
+                adaptation_schedule = WindowedAdaptationSchedule(warmup),
+                integrator = :leapfrog,
+                trace = (; acceptstat = zeros(T)); # TODO could probably use somesort of helper function
+                # TODO what of passing in user-defined update_diagnostics()?
                 kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
-    draws = Array{T, 3}(undef, M, stan.chains, stan.dims)
-    initialize_draws!(stan, ldg, draws; kwargs...)
-    initialize_stepsize!(stan, ldg, draws; kwargs...)
+    draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
+    # TODO can gradients always be a Matrix, even for Stan methods
+    # Stan doesn't need to be parallel, right? rather multithreaded.
+    gradients = Matrix{T}(undef, sampler.dims, sampler.chains)
+    momenta = randn!(similar(gradients))
+    # TODO will need to move this scale and shift to somewhere more specific to MEADS
+    acceptance_probabilities = 2 .* rand(sampler.chains) .- 1
+    # TODO fix argument order for initialize_* methods
+    initialize_draws!(draws_initializer,
+                      rng,
+                      ldg,
+                      draws,
+                      gradient;
+                      kwargs...)
+    
+    initialize_stepsize!(stepsize_adapter,
+                         metric(metric_adapter),
+                         rng,
+                         ldg,
+                         draws,
+                         gradient;
+                         integrator,
+                         kwargs...)
+    
+    initialize_trajectorylength!(trajectorylength_adapter,
+                                 stepsize(stepsize_adapter);
+                                 kwargs...)
     for m in 1:M
-        info = transition!(stan, m, ldg, draws;
-                           warmup, diagnostics, kwargs...)
-        # adapt!(...)
-        # update(diagnostics, m, info)
+        # TODO need a loop for chains
+        # how to generalize for MEADS?
+        info = transition!(sampler, m, ldg, momenta, draws; kwargs...)
+        adapt!(sampler,
+               adaptation_schedule,
+               metric_adapter,
+               stepsize_adapter,
+               trajectorylength_adapter;
+               info,
+               kwargs...)
+        # update_trace(trace, m, info)
     end
-    return draws, stan, diagnostics
-end
-
-function transition!(stan::AbstractStan, i, ldg, draws; kwargs...)
-    info = kernel!(stan, i, draws)
-    update_info!(get(kwargs, :diagnostics, (;)), i, info)
-    adapt_chains!(stan, i, ldg, draws; acceptstat = info.acceptstat, kwargs...)
+    return draws, stepsize_adapter, metric_adapter, diagnostics
 end
 
 # TODO function kernel!(...)
 
-function update_info!(dstore, i, info)
-    diagnostics = (
+function adapt!(sampler, schedule::WindowedAdaptationSchedule,
+                metric_adapter, stepsize_adapter, trajectorylength_adapter,
+                i, ldg, draws; kwargs...)
+    if i <= schedule.warmup
+        adapt_stepsize!(sampler, schedule, stepsize_adapter, i, ldg, draws; kwargs...)
+        set_stepsize!(sampler, schedule, stepsize_adapter, i, ldg, draws; kwargs...)
+        
+        adapt_metric!(sampler, schedule, metric_adapter, i, ldg, draws; kwargs...)
+        set_metric!(sampler, schedule, metric_adapter, i, ldg, draws; kwargs...)
+        
+        adapt_trajectorylength!(sampler, schedule, trajectorylength_adapter, i, ldg, draws; kwargs...)
+        set_trajectorylength!(sampler, schedule, trajectorylength_adapter, i, ldg, draws; kwargs...)
+
+        if i == schedule.closewindow
+            # TODO aren't I missing re-initialize_stepsize?
+            reset!(stepsize_adapter)
+            reset!(metric_adapter)
+            calculate_nextwindow!(schedule)
+        end
+    else
+        set_stepsize!(sampler, schedule, stepsize_adapter, i, ldg, draws;
+                      weighted_average = true, kwargs...)
+    end
+end
+
+function adapt_stepsize!(sampler, schedule, stepsize_adapter, i, draws; kwargs...)
+    update!(stepsize_adapeter, i, kwargs[:acceptstat]; kwargs...)
+end
+
+function set_stepsize!(sampler, schedule, stepsize_adapter, i, draws; kwargs...)
+    for chain in 1:sampler.chains
+        sampler.stepsize[chain] = stepsize(stepsize_adapter, chain; kwargs...)
+    end
+end
+
+function adapt_metric!(sampler, schedule, metric_adapter::OnlineMoments, i, ldg, draws; kwargs...)
+    if schedule.firstwindow <= i <= schedule.lastwindow
+        update!(metric_adapter, draws[i, :, :]; kwargs...)
+    end
+end
+
+function set_metric!(sampler, schedule, metric_adapter::OnlineMoments, i, ldg, draws; kwargs...)
+    for chain in 1:sampler.chains
+        sampler.metric[:, chain] .= metric(metric_adapt, chain; kwargs...)
+    end
+end
+
+function update_trace!(trace, m, info)
+    keys = (
         :accepted,
         :divergence,
         :energy,
@@ -64,51 +143,10 @@ function update_info!(dstore, i, info)
         :treedepth,
         :leapfrog
     )
-    for d in diagnostics
-        if haskey(info, d)
-            dstore.accepted[i] = info[d]
+    for k in keys
+        if haskey(info, k)
+            trace.accepted[m] = info[k]
         end
     end
 end
 
-# TODO what would it look like for adapt_chains to specialize both
-# a sampler and a LearningSchedule(Windowed, Exponential, Linear, Polynomial, ...)
-# BUT I really want each adaptation parameter to be able to be adapted under different schedules
-# the adaptation schedule should be part of the adapter(dualaverage, Adam, Adamw)
-
-
-
-function adapt_chains!(stan::AbstractStan, i, ldg, draws; kwargs...)
-    winowed_adapter = get(kwargs, :wa, WindowedAdapter(0))
-    warmup = get(kwargs, :warmup, 0)
-
-    if i <= warmup
-        adapt_stepsize!(stan, i, draws; kwargs...)
-        adapt_metric!(stan, i, draws; kwargs...)
-
-        if i == stan.owa.closewindow
-            reset!(stan.dualaverage_ε)
-            reset!(stan.om)
-            calculate_nextwindow!(stan.owa)
-        end
-    else
-        stan.dualaverage_ε.ε = stan.dualaverage_ε.εbar
-    end
-end
-
-function adapt_stepsize!(stan::AbstractStan, i, draws; kwargs...)
-    update!(stan.dualaverage_ε, i, kwargs[:acceptstat])
-end
-
-function adapt_metric!(stan::AbstractStan, i, draws; kwargs...)
-    if stan.owa.firstwindow <= i <= stan.owa.lastwindow
-        update!(stan.om, draws[i, :, :]; kwargs...)
-    end
-
-    if i == stan.owa.closewindow
-        w = stan.om.n / (stan.om.n + 5)
-        for chain in 1:stan.chains
-            stan.metric[:, chain] .= w .* stan.om.v[:, chain] .+ (1 - w) * 1e-3
-        end
-    end
-end
