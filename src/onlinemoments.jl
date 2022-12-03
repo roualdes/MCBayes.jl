@@ -21,7 +21,7 @@ size (d, c). When `update!(om::OnlineMoments, x::Matrix)` is called, update
 determines whether or not any updates will actually be applied.
 
 """
-OnlineMoments(d, c; update = true) = OnlineMoments(Float64, d, c; update = update)
+OnlineMoments(d, c = 1; update = true) = OnlineMoments(Float64, d, c; update = update)
 
 """
     update!(om::OnlineMoments, x::Matrix; kwargs...)

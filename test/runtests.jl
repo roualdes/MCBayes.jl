@@ -34,7 +34,7 @@ using Statistics
     v = reshape(var(x, dims = (1, 3); corrected = false), dims)
 
     # same moments for all chains of x
-    om = OnlineMoments(dims, 1)
+    om = OnlineMoments(dims)
 
     for n in 1:N
         update!(om, x[n, :, :])

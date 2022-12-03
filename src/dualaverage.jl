@@ -43,36 +43,32 @@ function DualAverage(chains;
                        update)
 end
 
-function _update_one!(da::DualAverage, αs; kwargs...)
+function update!(da::DualAverage, αs; kwargs...)
     if da.update
-        for chain in eachindex(αs)
-            da.counter[chain] += 1
-            α = αs[chain] > 1 ? 1 : αs[chain]
-            eta = 1 / (da.counter[chain] + da.t0[chain])
-            da.sbar[chain] = (1 - eta) * da.sbar[chain] + eta * (da.δ[chain] - α)
-            x = da.μ[chain] - da.sbar[chain] * sqrt(da.counter[chain]) / da.γ[chain]
-            xeta = da.counter[chain] ^ -da.κ[chain]
-            da.xbar[chain] = xeta * x + (1 - xeta) * da.xbar[chain]
-            da.ε[chain] = exp(x)
-            da.εbar[chain] = exp(da.xbar[chain])
-        end
+        da.counter .+= 1
+        α = [a > 1 ? 1 : a for a in αs]
+        eta = 1 ./ (da.counter .+ da.t0)
+        @. da.sbar = (1 - eta) * da.sbar + eta * (da.δ - a)
+        x = da.μ .- da.sbar .* sqrt.(da.counter) ./ da.γ
+        xeta = da.counter .^ -da.κ
+        @. da.xbar = xeta * x + (1 - xeta) * da.xbar
+        @. da.ε = exp(x)
+        @. da.εbar = exp(da.xbar)
     end
 end
 
 function reset!(da::DualAverage)
-    for chain in eachindex(da.ε)
-        da.μ[chain] = log(10 * da.ε[chain])
-        da.sbar = zero(da.sbar)
-        da.xbar = zero(da.xbar)
-        da.counter = zero(da.counter)
-    end
+    @. da.μ = log(10 * da.ε)
+    da.sbar .= 0
+    da.xbar .= 0
+    da.counter .= 0
 end
 
 
-function stepsize(da::DualAverage, chain; weighted_average = false, kwargs...)
-    stepsize = da.ε[chain]
+function stepsize(da::DualAverage; weighted_average = false, kwargs...)
+    stepsize = da.ε
     if weighted_average
-        stepsize = da.εbar[chain]
+        stepsize = da.εbar
     end
     return stepsize
 end

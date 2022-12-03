@@ -2,16 +2,6 @@ function initialize_draws!(method::Symbol, draws, gradient, rng, ldg; kwargs...)
     initialize_draws!(Val{method}(), draws, gradient, rng, ldg; kwargs...)
 end
 
-# TODO will gradient ever be a vector? Do we need this method?
-function initialize_draws!(::Val{:stan}, draws::Array, gradient::Vector,
-                           rng, ldg; kwargs...)
-    chains = size(draws, 3)
-    for chain in 1:chains
-        @views stan_initialize_draw!(draws[1, :, chain], gradient,
-                                     rng, ldg; kwargs...)
-    end
-end
-
 function initialize_draws!(::Val{:stan}, draws::Array, gradients::Matrix,
                            rng, ldg; kwargs...)
     chains = size(draws, 3)
@@ -74,4 +64,3 @@ function initialize_draws!(::Val{:none}, draws::Array, gradients, rng, ldg; kwar
             "supply initial_draw with dimensions $dims by $chains")
     end
 end
-

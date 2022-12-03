@@ -1,20 +1,21 @@
-function initialize_stepsize!(method::Symbol, adapter, metric, rng, ldg, draws, gradient; kwargs...)
-    if adapter.update
-        initialize_stepsize!(Val{method}(), adapter, rng, metric, ldg, draws, gradient;
-                             kwargs...)
+function initialize_stepsize!(adapter, metric, rng, ldg, draws, gradient; kwargs...)
+    init_stepsize!(adapter.initializer, adapter, metric, rng, ldg, draws, gradient;
+                         kwargs...)
+end
+
+function init_stepsize!(method::Symbol, adapter, metric, rng, ldg, draws, gradient; kwargs...)
+    init_stepsize!(Val{method}(), adapter, metric, rng, ldg, draws, gradients; kwargs...)
+end
+
+function init_stepsize!(::Val{:stan}, adapter, metric, rng, ldg,
+                        draws::Array, gradients::Matrix; kwargs...)
+    for chain in axes(draws, 3)
+        stan_init_stepsize!(adapter, metric, rng, ldg,
+                            draws[1, :, chain], gradients[:, chain]; kwargs...)
     end
 end
 
-function initialize_stepsize!(::Val{:stan}, adapter, metric, rng, ldg,
-                              draws::Array, gradients::Matrix; kwargs...)
-    chains = size(draws, 3)
-    for chain in 1:chains
-        stan_initialize_stepsize!(adapter, metric, rng, ldg,
-                                  draws[1, :, chain], gradients[:, chain]; kwargs...)
-    end
-end
-
-function stan_initialize_stepsize!(adapter, metric, rng, ldg, position, gradient; kwargs...)
+function stan_init_stepsize!(adapter, metric, rng, ldg, position, gradient; kwargs...)
     T = eltype(draws)
     dims = size(draws, 2)
     q = copy(position)
@@ -65,12 +66,12 @@ function initialize_stepsize!(::Val{:adam}, adapter, metric, rng, ldg,
     # TODO need do anything here?
 end
 
-function initialize_stepsize!(::Val{:chees}, adapter, metric, rng, ldg,
-                              draws::Array, gradients::Matrix; kwargs...)
+function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg,
+                        draws::Array, gradients::Matrix; kwargs...)
     T = eltype(draws)
     chains = size(draws, 3)
     num_metrics = size(metrics, 2)
-    
+
     αs = zeros(T, chains)
     ε = 2 * one(T)
     harmonic_mean = zero(T)
@@ -78,15 +79,13 @@ function initialize_stepsize!(::Val{:chees}, adapter, metric, rng, ldg,
 
     while harmonic_mean < oftype(x, 0.5)
         ε /= 2
-        
+
         for (metric, chain) in zip(Iterators.cylce(1:metrics), 1:chains)
             # TODO keep, if this is needed. Otherwise, ditch. adapter.ε = ε
-            # TODO info = hmc!() 
+            # TODO info = hmc!()
             αs[chain] = info.acceptstat
         end
         harmonic_mean = inv(mean(inv, αs))
     end
     adapter.ε = ε
 end
-
-
