@@ -9,6 +9,6 @@ Documentation for [MCBayes](https://github.com/roualdes/MCBayes.jl).
 ```@index
 ```
 
-```@autodocs
-Modules = [MCBayes]
+```@docs
+OnlineMoments
 ```
