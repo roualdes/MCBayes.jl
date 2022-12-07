@@ -61,6 +61,7 @@ function sample(sampler::Stan{T}, ldg;
                          gradient;
                          integrator,
                          kwargs...)
+    set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
     for m in 1:M
         info = transition!(sampler,
@@ -75,6 +76,8 @@ function sample(sampler::Stan{T}, ldg;
                            kwargs...)
         adapt!(sampler,
                adaptation_schedule,
+               m,
+               draws,
                metric_adapter,
                stepsize_adapter,
                trajectorylength_adapter;
@@ -94,32 +97,46 @@ function transition!(sampler::Stan, m, ldg, draws, rng, momenta, acceptance_prob
         # TODO copy stankernel from previous efforts and double return values
         # and note how update_trace wants things, iterations by chains => collect returned info from stan_kernel! here
     end
-
 end
 
-function adapt_stepsize!(sampler::Stan, schedule, stepsize_adapter, i, draws; kwargs...)
-    update!(stepsize_adapeter, kwargs[:acceptstat]; kwargs...)
-end
+function adapt!(sampler,
+                schedule::WindowedAdaptationSchedule,
+                i, ldg, draws, gradients, rng,
+                metric_adapter, stepsize_adapter, trajectorylength_adapter; kwargs...)
+    warmup = schedule.warmup
+    if i <= warmup
+        update!(stepsize_adapter, kwargs[:acceptstat]; warmup, kwargs...)
+        set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
-function set_stepsize!(sampler::Stan, schedule, stepsize_adapter, i, draws; kwargs...)
-    sampler.stepsize .= stepsize(stepsize_adapter; kwargs...)
-end
+        update!(trajectorylength_adapter; kwargs...)
+        set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
 
-function adapt_metric!(sampler::Stan, schedule::WindowedAdaptationSchedule, metric_adapter::OnlineMoments, i, draws; kwargs...)
-    if schedule.firstwindow <= i <= schedule.lastwindow
-        update!(metric_adapter, draws[i, :, :]; kwargs...)
+        if schedule.firstwindow <= i <= schedule.lastwindow
+            @views update!(metric_adapter, draws[i, :, :]; kwargs...)
+        end
+
+        if i == schedule.closewindow
+            initialize_stepsize!(stepsize_adapter, sampler.metric, rng, ldg, draws, gradients; kwargs...)
+            set_stepsize!(sampler, stepsize_adapter; kwargs...)
+            reset!(stepsize_adapter)
+
+            set_metric!(sampler, metric_adapter; kwargs...)
+            reset!(metric_adapter)
+        end
     end
 end
 
-function set_metric!(sampler::Stan, schedule, metric_adapter, i, draws; kwargs...)
-    sampler.metric .= metric(metric_adapt; kwargs...)
+function set_stepsize!(sampler, adapter; kwargs...)
+    sampler.stepsize .= optimum(adapter)
 end
 
-function adapt_trajectorylength!(sampler::Stan, schedule, trajectorylength_adapter, i, draws; kwargs...)
+function set_trajectorylength!(sampler::Stan, adapter; kwargs...)
 end
 
-function set_trajectorylength!(sampler::Stan, schedule, trajectorylength_adapter, i, draws; kwargs...)
+function set_metric!(sampler, adapter; kwargs...)
+    sampler.metric .= metric(adapter; kwargs...)
 end
+
 
 function update_trace!(sampler::Stan, trace, m, info)
     keys = (
