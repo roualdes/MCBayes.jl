@@ -28,17 +28,17 @@ function Stan(dims,
                 maxdeltaH)
 end
 
-function sample(sampler::Stan{T}, ldg;
+function sample(sampler::AbstractSampler{T}, ldg;
                 iterations = 2000,
-                warmup = div(iteration, 2),
-                rng = Random.Xoshiro(sampler.seed),
+                warmup = div(iterations, 2),
+                rng = Random.Xoshiro.(sampler.seed),
                 draws_initializer = :stan,
                 stepsize_adapter = DualAverage(sampler.chains),
                 trajectory_lengthadapter = (; initializer = :stan),
                 metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
                 adaptation_schedule = WindowedAdaptationSchedule(warmup),
                 integrator = :leapfrog,
-                trace = (; acceptstat = zeros(T, iterations + warmup, sampler.chains)); # TODO doc expects sizes as iterations by chains
+                trace = (; acceptstat = zeros(T, iterations + warmup, sampler.chains)), # TODO doc expects sizes as iterations by chains
                 kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
     draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
@@ -50,7 +50,7 @@ function sample(sampler::Stan{T}, ldg;
                       rng,
                       ldg,
                       draws,
-                      gradient;
+                      gradients;
                       kwargs...)
 
     initialize_stepsize!(stepsize_adapter,
@@ -58,34 +58,36 @@ function sample(sampler::Stan{T}, ldg;
                          rng,
                          ldg,
                          draws,
-                         gradient;
+                         gradients;
                          integrator,
                          kwargs...)
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
-    for m in 1:M
-        info = transition!(sampler,
-                           m,
-                           ldg,
-                           draws,
-                           rng,
-                           momenta,
-                           metric(metric_adapter),
-                           stepsize(stepsize_adapter),
-                           acceptance_probabilities;
-                           kwargs...)
-        adapt!(sampler,
-               adaptation_schedule,
-               m,
-               draws,
-               metric_adapter,
-               stepsize_adapter,
-               trajectorylength_adapter;
-               info...,
-               kwargs...)
-        # update_trace(trace, m, info)
-    end
-    return draws, sampler, diagnostics
+    return stepsize(stepsize_adapter)
+
+    # for m in 1:M
+    #     info = transition!(sampler,
+    #                        m,
+    #                        ldg,
+    #                        draws,
+    #                        rng,
+    #                        momenta,
+    #                        metric(metric_adapter),
+    #                        stepsize(stepsize_adapter),
+    #                        acceptance_probabilities;
+    #                        kwargs...)
+    #     adapt!(sampler,
+    #            adaptation_schedule,
+    #            m,
+    #            draws,
+    #            metric_adapter,
+    #            stepsize_adapter,
+    #            trajectorylength_adapter;
+    #            info...,
+    #            kwargs...)
+    #     # update_trace(trace, m, info)
+    # end
+    # return draws, sampler, diagnostics
 end
 
 function transition!(sampler::Stan, m, ldg, draws, rng, momenta, acceptance_probabilities; kwargs...)

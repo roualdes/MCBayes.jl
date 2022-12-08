@@ -1,4 +1,4 @@
-mutable struct WindowedAdaptationSchedule <: AbstractAdaptationSchedule
+mutable struct WindowedAdaptationSchedule
     closewindow::Int
     windowsize::Int
     const warmup::Int
@@ -8,7 +8,7 @@ end
 
 function WindowedAdaptationSchedule(warmup; initbuffer = 75, termbuffer = 50, windowsize = 25)
     # TODO probably want some reasonable checks on warmup values
-    return OnlineWindowedAdapter(
+    return WindowedAdaptationSchedule(
         initbuffer + windowsize,
         windowsize,
         warmup,
