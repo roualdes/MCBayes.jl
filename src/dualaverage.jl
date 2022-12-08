@@ -4,7 +4,7 @@
 # and then the Adam optimized stepsize will need a stepsize method too
 # TODO need a method to set ε, from initialize_stepsize
 
-struct DualAverage{T <: AbstractFloat} <: AbstractAdapter
+struct DualAverage{T <: AbstractFloat}
     ε::Vector{T}
     μ::Vector{T}
     εbar::Vector{T}
@@ -20,11 +20,11 @@ struct DualAverage{T <: AbstractFloat} <: AbstractAdapter
 end
 
 function DualAverage(chains;
-                     ε = 1.0
+                     ε = 1.0,
                      μ = log(10 * ε),
                      δ = 0.8,
                      γ = 0.05,
-                     t0 = 10.0
+                     t0 = 10.0,
                      κ = 0.75,
                      initializer = :stan,
                      update = true)

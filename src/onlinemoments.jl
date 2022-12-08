@@ -1,5 +1,5 @@
 # TODO adapt to matrix metric
-struct OnlineMoments{T <: AbstractFloat} <: AbstractAdapter
+struct OnlineMoments{T <: AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
     v::Matrix{T}
