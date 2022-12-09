@@ -41,16 +41,18 @@ function sample(sampler::AbstractSampler{T}, ldg;
                 trace = (; acceptstat = zeros(T, iterations + warmup, sampler.chains)), # TODO doc expects sizes as iterations by chains
                 kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
-    draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
-    gradients = Matrix{T}(undef, sampler.dims, sampler.chains)
-    momenta = randn!(similar(gradients))
-    acceptance_probabilities = rand(sampler.chains)
+    # draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
+    draws = [[zeros(T, sampler.dims) for _ in 1:sampler.chains] for _ in 1:M] # draws[iteration][chain][dimension]
+    # gradients = Matrix{T}(undef, sampler.dims, sampler.chains)
+    gradients = [zeros(T, sampler.dims) for _ in 1:sampler.chains] # gradients[chain][dimension]
+    momenta = [randn(T, sampler.dims) for _ in 1:sampler.chains]      # momenta[chain][dimension]
+    acceptance_probabilities = rand(sampler.chains)                # a[chain]
     # TODO double check argument order for initialize_* methods
     initialize_draws!(draws_initializer,
-                      rng,
-                      ldg,
                       draws,
-                      gradients;
+                      gradients,
+                      rng,
+                      ldg;
                       kwargs...)
 
     initialize_stepsize!(stepsize_adapter,
@@ -63,7 +65,7 @@ function sample(sampler::AbstractSampler{T}, ldg;
                          kwargs...)
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
-    return stepsize(stepsize_adapter)
+    return optimum(stepsize_adapter)
 
     # for m in 1:M
     #     info = transition!(sampler,

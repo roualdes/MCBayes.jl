@@ -17,6 +17,7 @@ struct DualAverage{T <: AbstractFloat}
     counter::Vector{Int}
     initializer::Symbol
     update::Bool
+    smooth::Bool
 end
 
 function DualAverage(chains;
@@ -27,11 +28,12 @@ function DualAverage(chains;
                      t0 = 10.0,
                      κ = 0.75,
                      initializer = :stan,
-                     update = true)
+                     update = true,
+                     smooth = true)
     T = eltype(ε)
     return DualAverage([ε for _ in 1:chains],
                        [μ for _ in 1:chains],
-                       zeros(T, chains),
+                       ones(T, chains),
                        zeros(T, chains),
                        zeros(T, chains),
                        [oftype(ε, γ)  for _ in 1:chains],
@@ -40,7 +42,8 @@ function DualAverage(chains;
                        [oftype(ε, t0) for _ in 1:chains],
                        zeros(Int, chains),
                        initializer,
-                       update)
+                       update,
+                       smooth)
 end
 
 function update!(da::DualAverage, αs; kwargs...)
@@ -50,10 +53,14 @@ function update!(da::DualAverage, αs; kwargs...)
         eta = 1 ./ (da.counter .+ da.t0)
         @. da.sbar = (1 - eta) * da.sbar + eta * (da.δ - a)
         x = da.μ .- da.sbar .* sqrt.(da.counter) ./ da.γ
-        xeta = da.counter .^ -da.κ
-        @. da.xbar = xeta * x + (1 - xeta) * da.xbar
         @. da.ε = exp(x)
-        @. da.εbar = exp(da.xbar)
+        if da.smooth
+            xeta = da.counter .^ -da.κ
+            @. da.xbar = xeta * x + (1 - xeta) * da.xbar
+            @. da.εbar = exp(da.xbar)
+        else
+            da.εbar .= da.ε
+        end
     end
 end
 
@@ -65,10 +72,6 @@ function reset!(da::DualAverage)
 end
 
 
-function stepsize(da::DualAverage; weighted_average = false, kwargs...)
-    stepsize = da.ε
-    if weighted_average
-        stepsize = da.εbar
-    end
-    return stepsize
+function optimum(da::DualAverage)
+    return da.εbar
 end

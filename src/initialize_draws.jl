@@ -2,18 +2,14 @@ function initialize_draws!(method::Symbol, draws, gradient, rng, ldg; kwargs...)
     initialize_draws!(Val{method}(), draws, gradient, rng, ldg; kwargs...)
 end
 
-function initialize_draws!(::Val{:stan}, draws::Array, gradients::Matrix,
-                           rng, ldg; kwargs...)
-    chains = size(draws, 3)
-    @assert chains == size(gradients, 2) "Need as many gradients as chains"
-    for chain in 1:chains
-        @views stan_initialize_draw!(draws[1, :, chain], gradients[:, chain],
-                                     rng, ldg; kwargs...)
+function initialize_draws!(::Val{:stan}, draws, gradients, rng, ldg; kwargs...)
+    for chain in eachindex(draws[1])
+        stan_initialize_draw!(draws[1][chain], gradients[chain], ldg, rng[chain]; kwargs...)
     end
 end
 
-function stan_initialize_draw!(position::Vector, gradient::Vector,
-                               ldg, rng; radius = 2, attempts = 100, kwargs...)
+function stan_initialize_draw!(position, gradient, ldg, rng;
+                               radius = 2, attempts = 100, kwargs...)
     initialized = false
     a = 0
     T = eltype(position)
@@ -38,7 +34,7 @@ function stan_initialize_draw!(position::Vector, gradient::Vector,
     @assert a <= attempts && initialized "Failed to find inital values in $(attempts) attempts."
 end
 
-function initialize_draws!(::Val{:sga}, draws::Array, gradients::Matrix,
+function initialize_draws!(::Val{:sga}, draws::AbstractArray, gradients::AbstractMatrix,
                            rng, ldg; steps = 100,
                            initialize_draws_adam = Adam(),
                            number_threads = Threads.nthreads(),
@@ -55,7 +51,7 @@ function initialize_draws!(::Val{:sga}, draws::Array, gradients::Matrix,
     end
 end
 
-function initialize_draws!(::Val{:none}, draws::Array, gradients, rng, ldg; kwargs...)
+function initialize_draws!(::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...)
     if haskey(kwargs, :initial_draw)
         draws[1, :, :] .= initial_draw
     else
