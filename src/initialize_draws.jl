@@ -1,14 +1,17 @@
-function initialize_draws!(method::Symbol, draws, gradient, rng, ldg; kwargs...)
-    initialize_draws!(Val{method}(), draws, gradient, rng, ldg; kwargs...)
+function initialize_draws!(method::Symbol, draws, rng, ldg; kwargs...)
+    initialize_draws!(Val{method}(), draws, rng, ldg; kwargs...)
 end
 
-function initialize_draws!(::Val{:stan}, draws, gradients, rng, ldg; kwargs...)
-    for chain in eachindex(draws[1])
-        stan_initialize_draw!(draws[1][chain], gradients[chain], ldg, rng[chain]; kwargs...)
+function initialize_draws!(::Val{:stan}, draws, rng, ldg; kwargs...)
+    for chain in axes(draws, 3)
+        draws[1, :, chain] = stan_initialize_draw(draws[1, :, chain],
+                                                  ldg,
+                                                  rng[chain];
+                                                  kwargs...)
     end
 end
 
-function stan_initialize_draw!(position, gradient, ldg, rng;
+function stan_initialize_draw(position, ldg, rng;
                                radius = 2, attempts = 100, kwargs...)
     initialized = false
     a = 0
@@ -17,9 +20,9 @@ function stan_initialize_draw!(position, gradient, ldg, rng;
 
     while a < attempts && !initialized
         position .= radius .* (2 .* rand(rng, T, dims) .- 1)
-        lp = ldg(position, gradient; kwargs...)
+        ld, gradient = ldg(position; kwargs...)
 
-        if isfinite(lp) && !isnan(lp)
+        if isfinite(ld) && !isnan(ld)
             initialized = true
         end
 
@@ -31,16 +34,19 @@ function stan_initialize_draw!(position, gradient, ldg, rng;
         a += 1
     end
 
-    @assert a <= attempts && initialized "Failed to find inital values in $(attempts) attempts."
+    if a > attempts
+        throw("Failed to find inital values in $(attempts) attempts.")
+    end
+    return position
 end
 
-function initialize_draws!(::Val{:sga}, draws::AbstractArray, gradients::AbstractMatrix,
-                           rng, ldg; steps = 100,
+# TODO needs a second look
+function initialize_draws!(::Val{:sga}, draws, rng, ldg;
+                           steps = 100,
                            initialize_draws_adam = Adam(),
                            number_threads = Threads.nthreads(),
                            kwargs...)
     chains = size(draws, 3)
-    @assert chains == size(gradients, 2) "Need as many gradients as chains"
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
             for s in 1:steps

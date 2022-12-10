@@ -63,11 +63,10 @@ function pghmc!(integrator, next_position, position, momenta, ldg, gradient, ste
             )
 end
 
-function rand_momenta(rng, dims, metric)
-    T = eltype(metric)
-    return randn(rng, T, dims) ./ sqrt.(metric)
+function rand_momentum(rng, dims, metric)
+    return randn(rng, eltype(metric), dims) ./ sqrt.(metric)
 end
 
 function hamiltonian(ld, momenta, metric)
-    return ld - oftype(ld, 0.5 * dot(momenta, Diagonal(metric), momenta))
+    return -ld + dot(momenta, Diagonal(metric), momenta) / 2
 end
