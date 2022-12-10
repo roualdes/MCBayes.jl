@@ -12,6 +12,7 @@ include("initialize_stepsize.jl")
 include("stan.jl")
 include("tools.jl")
 include("integrator.jl")
+include("pspoint.jl")
 
 export
     Adam,
