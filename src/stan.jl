@@ -42,28 +42,23 @@ function sample(sampler::AbstractSampler{T}, ldg;
                 kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
     draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
-    gradients = Matrix{T}(undef, sampler.dims, sampler.chains)
-    momenta = randn!(similar(gradients))
+    momenta = randn(T, sampler.dims, sampler.chains) .* metric(metric_adapter)
     acceptance_probabilities = rand(sampler.chains)
     # TODO double check argument order for initialize_* methods
     initialize_draws!(draws_initializer,
-                      rng,
-                      ldg,
                       draws,
-                      gradients;
+                      rng,
+                      ldg;
                       kwargs...)
 
     initialize_stepsize!(stepsize_adapter,
                          metric(metric_adapter),
                          rng,
                          ldg,
-                         draws,
-                         gradients;
+                         draws;
                          integrator,
                          kwargs...)
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
-
-    return stepsize(stepsize_adapter)
 
     # for m in 1:M
     #     info = transition!(sampler,
@@ -93,13 +88,139 @@ end
 function transition!(sampler::Stan, m, ldg, draws, rng, momenta, acceptance_probabilities; kwargs...)
     for chain in axes(draws, 3)
         metric = sampler.metric[:, chain]
-        stepsize = sampler.stepsize[:, chain]
+        stepsize = sampler.stepsize[chain]
         # TODO double check arguments and their order
-        @views stan_kernel!(draws[m, :, chain], draws[m+1, :, chain], rng, sampler.dims, metric, stepsize, sampler.maxdeltaH, sampler.maxtreedepth)
+        stan_kernel!(draws[m, :, chain], draws[m+1, :, chain], rng, sampler.dims, metric, stepsize, sampler.maxdeltaH, sampler.maxtreedepth)
         # TODO copy stankernel from previous efforts and double return values
         # and note how update_trace wants things, iterations by chains => collect returned info from stan_kernel! here
     end
 end
+
+
+function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg)
+    T = eltype(position)
+    z = PhasePoint(position, rand_momentum(rng, dims, metric))
+    ld, gradient = ldg(z.position)
+    H0 = hamiltonian(ld, z.momentum, metric)
+
+    zf = copy(z)
+    zb = copy(z)
+    zsample = copy(z)
+    zpr = copy(z)
+
+    # Momentum and sharp momentum at forward end of forward subtree
+    pff = copy(z.momentum)
+    psharpff = z.p .* metric
+
+    # Momentum and sharp momentum at backward end of forward subtree
+    pfb = copy(pff)
+    psharpfb = copy(psharpff)
+
+    # Momentum and sharp momentum at forward end of backward subtree
+    pbf = copy(pff)
+    psharpbf = copy(psharpff)
+
+    # Momentum and sharp momentum at backward end of backward subtree
+    pbb = copy(pff)
+    psharpbb = copy(psharpff)
+
+    # Integrated momenta along trajectory
+    rho = copy(pff)
+
+    α = zero(T)
+    lsw = zero(T)
+    depth = zero(maxtreedepth)
+    nleapfrog = zero(Int)
+
+    divergence = zero(Bool)
+    accepted = zero(Bool)
+
+    while depth < maxtreedepth
+
+        rhof = zero(rho)
+        rhob = zero(rho)
+        lswsubtree = typemin(T)
+
+        if rand(rng, Bool)
+            rhob .= rho
+            pbf .= pff
+            psharpbf .= psharpff
+
+            z.q .= zf.q
+            z.p .= zf.p
+
+            validsubtree, nleapfrog, lswsubtree, α  =
+                buildtree!(depth, z, zpr, M, rng,
+                           psharpfb, psharpff, rhof, pfb, pff,
+                           H0, ε, maxdeltaH, lp,
+                           nleapfrog, lswsubtree, α)
+
+            zf.q .= z.q
+            zf.p .= z.p
+        else
+            rhof .= rho
+            pfb .= pbb
+            psharpfb .= psharpbb
+
+            z.q .= zb.q
+            z.p .= zb.p
+
+            validsubtree, nleapfrog, lswsubtree, α =
+                buildtree!(depth, z, zpr, M, rng,
+                           psharpbf, psharpbb, rhob, pbf, pbb,
+                           H0, -ε, maxdeltaH, lp,
+                           nleapfrog, lswsubtree, α)
+
+            zb.q .= z.q
+            zb.p .= z.p
+        end
+
+        if !validsubtree
+            divergence = true
+            break
+        end
+        depth += one(depth)
+
+        if lswsubtree > lsw
+            zsample.q .= zpr.q
+            zsample.p .= zpr.p
+            accepted = true
+        else
+            if rand(rng, T) < exp(lswsubtree - lsw)
+                zsample.q .= zpr.q
+                zsample.p .= zpr.p
+                accepted = true
+            end
+        end
+
+        lsw = logsumexp(lsw, lswsubtree)
+
+        # Demand satisfication around merged subtrees
+        @. rho = rhob + rhof
+        persist = stancriterion(psharpbb, psharpff, rho)
+
+        # Demand satisfaction between subtrees
+        rhoextended = rhob + pfb
+        persist &= stancriterion(psharpbb, psharpfb, rhoextended)
+
+        @. rhoextended = rhof + pbf
+        persist &= stancriterion(psharpbf, psharpff, rhoextended)
+
+        !persist && break
+    end # end while
+
+
+    θ2 .= zsample.q
+    val_grad!(lp, θ2)
+    return (accepted = accepted,
+            divergence = divergence,
+            energy = hamiltonian(val(lp), zsample.p, M),
+            stepsize = ε,
+            acceptstat = α / nleapfrog,
+            treedepth = depth,
+            leapfrog = nleapfrog)
+end
+
 
 function adapt!(sampler,
                 schedule::WindowedAdaptationSchedule,

@@ -1,4 +1,4 @@
-struct Adam{T <: AbstractFloat} <: AbstractAdapter
+struct Adam{T <: AbstractFloat}
     x::Vector{T}
     xbar::Vector{T}
     m::Vector{T}

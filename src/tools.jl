@@ -2,7 +2,7 @@ function hmc!(integrator, next_position, position, momenta, ldg, gradient, steps
               kwargs...)
     T = eltype(position)
     next_position .= position
-    
+
     lp = ldg(position, gradient; kwargs...)
     H1 = hamiltonian(lp, momenta)
     isnan(H1) && (H1 = typemin(T))
@@ -16,7 +16,7 @@ function hmc!(integrator, next_position, position, momenta, ldg, gradient, steps
     a = min(1, exp(H1 + H2))
     accepted = rand(rng, T) < a
     accepted && (next_position .= position)
-    
+
     return (;
             accepted,
             divergent,
@@ -24,12 +24,12 @@ function hmc!(integrator, next_position, position, momenta, ldg, gradient, steps
             )
 end
 
-function pghmc!(integrator, ldg, next_position, position, momenta, ldg, gradient, stepsize, acceptance_probability, δ, nonreversible_update, maxdeltaH;
+function pghmc!(integrator, next_position, position, momenta, ldg, gradient, stepsize, acceptance_probability, δ, nonreversible_update, maxdeltaH;
                 kwargs...)
     T = eltype(position)
     next_position .= position
     next_momenta .= momenta
-    
+
     lp = ldg(position, gradient; kwargs...)
     H1 = hamiltonian(lp, momenta)
     isnan(H1) && (H1 = typemin(T))
@@ -60,5 +60,13 @@ function pghmc!(integrator, ldg, next_position, position, momenta, ldg, gradient
             accepted,
             divergent,
             acceptstat = abs(acceptance_probability)
-            )    
+            )
+end
+
+function rand_momentum(rng, dims, metric)
+    return randn(rng, eltype(metric), dims) ./ sqrt.(metric)
+end
+
+function hamiltonian(ld, momenta, metric)
+    return -ld + dot(momenta, Diagonal(metric), momenta) / 2
 end
