@@ -16,7 +16,7 @@ function Stan(dims,
               T = Float64;
               metric = ones(T, dims, chains),
               stepsize = ones(T, chains),
-              seed = [1:chains;],
+              seed = rand(1:typemax(Int), chains),
               maxtreedepth = 10,
               maxdeltaH = convert(T, 1000))
     return Stan(metric,
@@ -28,79 +28,82 @@ function Stan(dims,
                 maxdeltaH)
 end
 
-function sample(sampler::AbstractSampler{T}, ldg;
-                iterations = 2000,
-                warmup = div(iterations, 2),
-                rng = Random.Xoshiro.(sampler.seed),
-                draws_initializer = :stan,
-                stepsize_adapter = DualAverage(sampler.chains),
-                trajectory_lengthadapter = (; initializer = :stan),
-                metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
-                adaptation_schedule = WindowedAdaptationSchedule(warmup),
-                integrator = :leapfrog,
-                trace = (; acceptstat = zeros(T, iterations + warmup, sampler.chains)), # TODO doc expects sizes as iterations by chains
-                kwargs...) where {T <: AbstractFloat}
+function sample!(sampler::AbstractSampler{T}, ldg;
+                 iterations = 2000,
+                 warmup = div(iterations, 2),
+                 rngs = Random.Xoshiro.(sampler.seed),
+                 draws_initializer = :stan,
+                 stepsize_adapter = StepsizeDualAverage(ones(sampler.chains)),
+                 trajectorylength_adapter = TrajectorylengthConstant(zeros(sampler.chains)),
+                 metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
+                 adaptation_schedule = WindowedAdaptationSchedule(warmup),
+                 integrator = :leapfrog,
+                 kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
-    draws = Array{T, 3}(undef, M, sampler.dims, sampler.chains)
-    momenta = randn(T, sampler.dims, sampler.chains) .* metric(metric_adapter)
+    draws = Array{T, 3}(undef, M + 1, sampler.dims, sampler.chains)
+    momenta = randn(T, sampler.dims, sampler.chains) .* optimum(metric_adapter)
     acceptance_probabilities = rand(sampler.chains)
-    # TODO double check argument order for initialize_* methods
+    diagnostics = trace(sampler, M)
+
     initialize_draws!(draws_initializer,
                       draws,
-                      rng,
+                      rngs,
                       ldg;
                       kwargs...)
 
     initialize_stepsize!(stepsize_adapter,
-                         metric(metric_adapter),
-                         rng,
+                         sampler.metric,
+                         rngs,
                          ldg,
                          draws;
                          integrator,
                          kwargs...)
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
-    # for m in 1:M
-    #     info = transition!(sampler,
-    #                        m,
-    #                        ldg,
-    #                        draws,
-    #                        rng,
-    #                        momenta,
-    #                        metric(metric_adapter),
-    #                        stepsize(stepsize_adapter),
-    #                        acceptance_probabilities;
-    #                        kwargs...)
-    #     adapt!(sampler,
-    #            adaptation_schedule,
-    #            m,
-    #            draws,
-    #            metric_adapter,
-    #            stepsize_adapter,
-    #            trajectorylength_adapter;
-    #            info...,
-    #            kwargs...)
-    #     # update_trace(trace, m, info)
-    # end
-    # return draws, sampler, diagnostics
+    for m in 1:M
+        transition!(sampler,
+                    m,
+                    ldg,
+                    draws,
+                    rngs,
+                    momenta,
+                    optimum(metric_adapter),
+                    optimum(stepsize_adapter),
+                    acceptance_probabilities,
+                    diagnostics;
+                    kwargs...)
+
+        adapt!(sampler,
+               adaptation_schedule,
+               diagnostics,
+               m,
+               ldg,
+               draws,
+               rngs,
+               metric_adapter,
+               stepsize_adapter,
+               trajectorylength_adapter,
+               kwargs...)
+    end
+    return draws, diagnostics
 end
 
-function transition!(sampler::Stan, m, ldg, draws, rng, momenta, acceptance_probabilities; kwargs...)
-    for chain in axes(draws, 3)
+function transition!(sampler::Stan, m, ldg, draws, rngs, momenta, metric, stepsize, acceptance_probabilities, trace; kwargs...)
+    for chain in axes(draws, 3) # TODO multi-thread-able
         metric = sampler.metric[:, chain]
         stepsize = sampler.stepsize[chain]
-        # TODO double check arguments and their order
-        stan_kernel!(draws[m, :, chain], draws[m+1, :, chain], rng, sampler.dims, metric, stepsize, sampler.maxdeltaH, sampler.maxtreedepth)
-        # TODO copy stankernel from previous efforts and double return values
-        # and note how update_trace wants things, iterations by chains => collect returned info from stan_kernel! here
+        info = stan_kernel!(draws[m, :, chain], rngs[chain], sampler.dims, metric, stepsize,
+                            sampler.maxdeltaH, sampler.maxtreedepth, ldg; kwargs...)
+        draws[m + 1, :, chain] = info.position_next
+        store!(trace, info, m, chain)
     end
 end
 
 
-function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg)
+function stan_kernel!(position, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...)
     T = eltype(position)
-    z = PhasePoint(position, rand_momentum(rng, dims, metric))
-    ld, gradient = ldg(z.position)
+    z = PSPoint(position, rand_momentum(rng, dims, metric))
+    ld, gradient = ldg(z.position; kwargs...)
     H0 = hamiltonian(ld, z.momentum, metric)
 
     zf = copy(z)
@@ -110,7 +113,7 @@ function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxd
 
     # Momentum and sharp momentum at forward end of forward subtree
     pff = copy(z.momentum)
-    psharpff = z.p .* metric
+    psharpff = z.momentum .* metric
 
     # Momentum and sharp momentum at backward end of forward subtree
     pfb = copy(pff)
@@ -145,34 +148,26 @@ function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxd
             rhob .= rho
             pbf .= pff
             psharpbf .= psharpff
-
-            z.q .= zf.q
-            z.p .= zf.p
+            z .= zf
 
             validsubtree, nleapfrog, lswsubtree, α  =
-                buildtree!(depth, z, zpr, M, rng,
+                buildtree!(depth, z, zpr, metric, rng,
                            psharpfb, psharpff, rhof, pfb, pff,
-                           H0, ε, maxdeltaH, lp,
-                           nleapfrog, lswsubtree, α)
-
-            zf.q .= z.q
-            zf.p .= z.p
+                           H0, 1, stepsize, maxdeltaH, ldg,
+                           nleapfrog, lswsubtree, α; kwargs...)
+            zf .= z
         else
             rhof .= rho
             pfb .= pbb
             psharpfb .= psharpbb
-
-            z.q .= zb.q
-            z.p .= zb.p
+            z .= zb
 
             validsubtree, nleapfrog, lswsubtree, α =
-                buildtree!(depth, z, zpr, M, rng,
+                buildtree!(depth, z, zpr, metric, rng,
                            psharpbf, psharpbb, rhob, pbf, pbb,
-                           H0, -ε, maxdeltaH, lp,
-                           nleapfrog, lswsubtree, α)
-
-            zb.q .= z.q
-            zb.p .= z.p
+                           H0, -1, stepsize, maxdeltaH, ldg,
+                           nleapfrog, lswsubtree, α; kwargs...)
+            zb .= z
         end
 
         if !validsubtree
@@ -182,13 +177,11 @@ function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxd
         depth += one(depth)
 
         if lswsubtree > lsw
-            zsample.q .= zpr.q
-            zsample.p .= zpr.p
+            zsample .= zpr
             accepted = true
         else
             if rand(rng, T) < exp(lswsubtree - lsw)
-                zsample.q .= zpr.q
-                zsample.p .= zpr.p
+                zsample .= zpr
                 accepted = true
             end
         end
@@ -209,72 +202,138 @@ function _stankernel!(position, position_next, rng, dims, metric, stepsize, maxd
         !persist && break
     end # end while
 
+    position_next = zsample.position
+    ld, gradient = ldg(position_next; kwargs...)
 
-    θ2 .= zsample.q
-    val_grad!(lp, θ2)
-    return (accepted = accepted,
-            divergence = divergence,
-            energy = hamiltonian(val(lp), zsample.p, M),
-            stepsize = ε,
+    return (;
+            position_next,
+            accepted,
+            divergence,
+            stepsize,
+            energy = hamiltonian(ld, zsample.momentum, metric),
             acceptstat = α / nleapfrog,
             treedepth = depth,
-            leapfrog = nleapfrog)
+            leapfrog = nleapfrog
+            )
 end
 
+function buildtree!(depth, z, zpropose, metric, rng,
+                    psharpbeg, psharpend, rho, pbeg, pend,
+                    H0, direction, stepsize, maxdeltaH, ldg,
+                    nleapfrog, logsumweight, α; kwargs...)
+    T = eltype(z.position)
+    if iszero(depth)
+
+        ld, gradient = ldg(z.position; kwargs...)
+        integrator = get(kwargs, :integrator, :leapfrog)
+        ld, gradient = integrate!(integrator, z.position, z.momentum, ldg, gradient,
+                                  direction .* stepsize .* metric, 1)
+
+        nleapfrog += 1
+        zpropose .= z
+
+        H = hamiltonian(ld, z.momentum, metric)
+        isnan(H) && (H = typemin(T))
+        divergent = divergence(H, H0, maxdeltaH)
+
+        Δ = H0 - H
+        logsumweight = logsumexp(logsumweight, Δ)
+        α += Δ > zero(Δ) ? one(Δ) : exp(Δ)
+
+        @. psharpbeg = z.momentum * metric
+        psharpend .= psharpbeg
+
+        rho .+= z.momentum
+        pbeg .= z.momentum
+        pend .= z.momentum
+
+        return !divergent, nleapfrog, logsumweight, α
+    end
+
+    lswinit = typemin(T)
+
+    pinitend = similar(z.momentum)
+    psharpinitend = similar(z.momentum)
+    rhoinit = zero(rho)
+
+    validinit, nleapfrog, lswinit, α =
+        buildtree!(depth - one(depth), z, zpropose, metric, rng,
+                   psharpbeg, psharpinitend, rhoinit, pbeg, pinitend,
+                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswinit, α)
+
+    if !validinit
+        return validinit, nleapfrog, logsumweight, α
+    end
+
+    zfinalpr = copy(z)
+    lswfinal = typemin(T)
+
+    psharpfinalbeg = similar(z.momentum)
+    pfinalbeg = similar(z.momentum)
+    rhofinal = zero(rho)
+
+    validfinal, nleapfrog, lswfinal, α =
+        buildtree!(depth - one(depth), z, zfinalpr, metric, rng,
+                   psharpfinalbeg, psharpend, rhofinal, pfinalbeg, pend,
+                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswfinal, α)
+
+    if !validfinal
+        return validfinal, nleapfrog, logsumweight, α
+    end
+
+    lswsubtree = logsumexp(lswinit, lswfinal)
+
+    if lswfinal > lswsubtree
+        zpropose .= zfinalpr
+    else
+        if rand(rng, T) < exp(lswfinal - lswsubtree)
+            zpropose .= zfinalpr
+        end
+    end
+
+    logsumweight = logsumexp(logsumweight, lswsubtree)
+
+    rhosubtree = rhoinit + rhofinal
+    rho .+= rhosubtree
+
+    # Demand satisfaction around merged subtrees
+    persist = stancriterion(psharpbeg, psharpend, rhosubtree)
+
+    # Demand satisfaction between subtrees
+    @. rhosubtree = rhoinit + pfinalbeg
+    persist &= stancriterion(psharpbeg, psharpfinalbeg, rhosubtree)
+
+    @. rhosubtree = rhofinal + pinitend
+    persist &= stancriterion(psharpinitend, psharpend, rhosubtree)
+
+    return persist, nleapfrog, logsumweight, α
+end
 
 function adapt!(sampler,
                 schedule::WindowedAdaptationSchedule,
-                i, ldg, draws, gradients, rng,
+                trace,
+                m, ldg, draws, rngs,
                 metric_adapter, stepsize_adapter, trajectorylength_adapter; kwargs...)
     warmup = schedule.warmup
-    if i <= warmup
-        update!(stepsize_adapter, kwargs[:acceptstat]; warmup, kwargs...)
+    if m <= warmup
+        accept_stats = trace.acceptstat[m, :]
+        update!(stepsize_adapter, accept_stats; warmup, kwargs...)
         set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
         update!(trajectorylength_adapter; kwargs...)
         set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
 
-        if schedule.firstwindow <= i <= schedule.lastwindow
-            @views update!(metric_adapter, draws[i, :, :]; kwargs...)
+        if schedule.firstwindow <= m <= schedule.lastwindow
+            update!(metric_adapter, draws[m, :, :]; kwargs...)
         end
 
-        if i == schedule.closewindow
-            initialize_stepsize!(stepsize_adapter, sampler.metric, rng, ldg, draws, gradients; kwargs...)
+        if m == schedule.closewindow
+            initialize_stepsize!(stepsize_adapter, sampler.metric, rngs, ldg, draws; kwargs...)
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter)
 
             set_metric!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
-        end
-    end
-end
-
-function set_stepsize!(sampler, adapter; kwargs...)
-    sampler.stepsize .= optimum(adapter)
-end
-
-function set_trajectorylength!(sampler::Stan, adapter; kwargs...)
-end
-
-function set_metric!(sampler, adapter; kwargs...)
-    sampler.metric .= metric(adapter; kwargs...)
-end
-
-
-function update_trace!(sampler::Stan, trace, m, info)
-    keys = (
-        :accepted,
-        :divergence,
-        :energy,
-        :stepsize,
-        :acceptstat,
-        :treedepth,
-        :leapfrog
-    )
-    for k in keys
-        if haskey(info, k)
-            # TODO expects sizes as iteration by chains
-            trace[k][m, :] .= info[k]
         end
     end
 end

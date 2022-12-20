@@ -1,16 +1,19 @@
 """
 Point in general phase space.
 """
-struct PSPoint{T} <: AbstractArray{T, 1}
+struct PSPoint{T <: AbstractFloat} <: AbstractArray{T, 1}
     position::Vector{T}
     momentum::Vector{T}
+    function PSPoint(position, momentum)
+        T = eltype(position)
+        if length(position) != length(momentum) || T != eltype(momentum)
+            error("position and momentum must have same length and type")
+        end
+        new{T}(position, momentum)
+    end
 end
 
-
-
 Base.size(z::PSPoint) = (2 * Base.length(z.position),)
-
-Base.IndexStyle(::Type{<:PSPoint}) = IndexLinear()
 
 function Base.getindex(z::PSPoint, ind::Int)
     l = length(z.position)
@@ -32,29 +35,8 @@ function Base.setindex!(z::PSPoint, val, ind::Int)
     end
 end
 
-Base.similar(z::PSPoint{T}) where {T} = PSPoint{T}(similar(z.position), similar(z.momentum))
-
-Base.BroadcastStyle(::Type{<:PSPoint}) = Broadcast.ArrayStyle{PSPoint}()
-
-function Base.similar(bc::Broadcast.Broadcasted{<:PSPoint}, ::Type{T}) where T
-    return PSPoint{T}(Base.similar(z.position), Base.similar(z.momentum))
+function Base.similar(z::PSPoint, ::Type{T}, dims::Dims) where {T}
+    return PSPoint(similar(z.position), similar(z.momentum))
 end
 
-Base.similar(z::PSPoint, ::Type{T}, dims::Dims) where {T} = SparseArray(T, dims)
-
-
-
-Base.copy(z::PSPoint{T}) where {T} = PSPoint{T}(Base.copy(z.position), Base.copy(z.momentum))
-
-Base.eltype(z::PSPoint{T}) where {T} = T
-
-Base.show(io::IO, z::PSPoint) = print(io, "$([z.position; z.momentum])")
-
-function Base.show(io::IO, ::MIME"text/plain", z::PSPoint)
-    T = eltype(z)
-    print(io, "$(length(z))-element Phase Space Point{$(T)}\nposition: $(z.position)\nmomentum: $(z.momentum)")
-end
-
-position(z::PSPoint) = z.position
-
-mometnum(z::PSPoint) = z.momentum
+Base.IndexStyle(::Type{<:PSPoint}) = IndexLinear()

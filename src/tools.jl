@@ -70,3 +70,32 @@ end
 function hamiltonian(ld, momenta, metric)
     return -ld + dot(momenta, Diagonal(metric), momenta) / 2
 end
+
+function log1pexp(a)
+    a > zero(a) && return a + log1p(exp(-a))
+    return log1p(exp(a))
+end
+
+function logsumexp(a, b)
+    T = typeof(a)
+    a == typemin(T) && return b
+    isinf(a) && isinf(b) && return typemax(T)
+    a > b && return a + log1pexp(b - a)
+    return b + log1pexp(a - b)
+end
+
+function logsumexp(v::AbstractVector)
+    T = eltype(v)
+    length(v) == 0 && return typemin(T)
+    m = maximum(v)
+    isinf(m) && return m
+    return m + log(sum(vi -> exp(vi - m), v))
+end
+
+function divergence(H, H0, limit)
+    return H - H0 > limit
+end
+
+function stancriterion(pbeg, pend, rho)
+    return dot(pbeg, rho) > 0 && dot(pend, rho) > 0
+end

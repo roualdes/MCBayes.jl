@@ -1,20 +1,20 @@
-function initialize_stepsize!(adapter, metric, rng, ldg, draws; kwargs...)
-    init_stepsize!(adapter.initializer, adapter, metric, rng, ldg, draws; kwargs...)
+function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+    init_stepsize!(stepsize_adapter.initializer, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
 end
 
-function init_stepsize!(method::Symbol, adapter, metric, rng, ldg, draws; kwargs...)
-    init_stepsize!(Val{method}(), adapter, metric, rng, ldg, draws; kwargs...)
+function init_stepsize!(method::Symbol, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+    init_stepsize!(Val{method}(), stepsize_adapter, metric, rng, ldg, draws; kwargs...)
 end
 
-function init_stepsize!(::Val{:stan}, adapter, metric, rng, ldg, draws; kwargs...)
-    stepsize = optimum(adapter)
+function init_stepsize!(::Val{:stan}, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+    stepsize = stepsize_adapter.initial_stepsize
     for chain in axes(draws, 3)
-        stepsize[chain] = stan_init_stepsize(stepsize[chain],
-                                             metric[:, chain],
-                                             rng[chain],
-                                             ldg,
-                                             draws[1, :, chain];
-                                             kwargs...)
+        stepsize_adapter.stepsize[chain] = stan_init_stepsize(stepsize[chain],
+                                                              metric[:, chain],
+                                                              rng[chain],
+                                                              ldg,
+                                                              draws[1, :, chain];
+                                                              kwargs...)
     end
 end
 
@@ -65,7 +65,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
 end
 
 function initialize_stepsize!(::Val{:adam}, adapter, metric, rng, ldg,
-                              draws::Array, gradients::Matrix; kwargs...)
+                              draws::Array; kwargs...)
     # TODO need do anything here?
 end
 

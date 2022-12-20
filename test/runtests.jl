@@ -14,18 +14,18 @@ using Statistics
     om = OnlineMoments(dims, chains)
 
     for n in 1:N
-        update!(om, x[n, :, :])
+        MCBayes.update!(om, x[n, :, :])
     end
 
     @test om.n[1] == N
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
-    @test isapprox(metric(om; regularized = false), om.v)
+    @test isapprox(optimum(om; regularized = false), om.v)
     w = om.n ./ (om.n .+ 5)
     v = @. w' * om.v + (1 - w') * 1e-3
-    @test isapprox(metric(om), v)
+    @test isapprox(optimum(om), v)
 
-    reset!(om)
+    MCBayes.reset!(om)
     @test iszero(om.n)
     @test iszero(om.m)
     @test iszero(om.v)
@@ -37,38 +37,42 @@ using Statistics
     om = OnlineMoments(dims)
 
     for n in 1:N
-        update!(om, x[n, :, :])
+        MCBayes.update!(om, x[n, :, :])
     end
 
     @test om.n[1] == N * chains
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
-    @test isapprox(metric(om; regularized = false), om.v)
+    @test isapprox(optimum(om; regularized = false), om.v)
     w = om.n ./ (om.n .+ 5)
     v = @. w' * om.v + (1 - w') * 1e-3
-    @test isapprox(metric(om), v)
+    @test isapprox(optimum(om), v)
 
 end
 
 @testset "Phase space point" begin
-    z = PSPoint([1; 2; 3], [4; 5; 6])
 
-    @test isequal(position(z) == [1; 2; 3])
-    @test isequal(momentum(z) == [4; 5; 6])
-    @test isequal(size(z) = (3, 2))
-    @test isequal(z[1], 1)
-    @test isequal(z[6], 6)
+    @test_throws TypeError MCBayes.PSPoint([1;], [2;])
+    @test_throws ErrorException MCBayes.PSPoint([1.0; 2.0], [3.0;])
 
-    q = rand(5)
-    p = rand(5)
-    z = PSPoint(q, p)
+    z = MCBayes.PSPoint([1.0; 2.0; 3.0], [4.0; 5.0; 6.0])
+
+    @test isequal(size(z), (6, ))
+    @test isequal(length(z), 6)
+
+    @test isapprox(z[1], 1.0)
+    @test isapprox(z[6], 6.0)
+
     zz = copy(z)
-    # TODO would prefer to get isapprox(z, zz) working
-    @test isapprox(z.position, zz.position)
-    @test isapprox(z.momentum, zz.momentum)
+    @test isequal(typeof(z), typeof(zz))
+    @test isapprox(z, zz)
 
     zzz = similar(z)
+    @test isequal(typeof(z), typeof(zz))
+    @test isequal(size(zzz), (6, ))
+    @test isequal(length(zzz), 6)
+
     zzz .= z
-    @test isapprox(z.position, zzz.position)
-    @test isapprox(z.momentum, zzz.momentum)
+    @test isapprox(z, zzz)
+
 end

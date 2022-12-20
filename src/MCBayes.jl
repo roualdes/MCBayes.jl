@@ -6,6 +6,8 @@ using LinearAlgebra
 include("windowedadaptation.jl")
 include("dualaverage.jl")
 include("adam.jl")
+include("stepsize_adapter.jl")
+include("trajectorylength_adapter.jl")
 include("onlinemoments.jl")
 include("initialize_draws.jl")
 include("initialize_stepsize.jl")
@@ -13,33 +15,21 @@ include("stan.jl")
 include("tools.jl")
 include("integrator.jl")
 include("pspoint.jl")
+include("trace.jl")
 
 export
+    Stan,
+
     Adam,
     OnlineMoments,
+    StepsizeAdam,
+    StepsizeDualAverage,
+    StepsizeConstant,
+    TrajectorylengthAdam,
+    TrajectorylengthConstant,
 
-    optimum,
-    update!,
-    reset!,
-    metric,
+    sample!,
 
-    initialize_draws!,
-    initialize_stepsize!,
-    #initialize_trajectorylength!,
-
-    transition,
-    adapt!,
-    adapt_stepsize!,
-    set_stepsize!,
-    adapt_metric!,
-    set_metric!,
-    adapt_trajectorylength!,
-    set_trajectorylength!,
-
-    hmc!,
-    rand_momenta,
-    hamiltonian,
-
-    integrate!
+    optimum
 
 end
