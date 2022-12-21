@@ -33,9 +33,9 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                  warmup = div(iterations, 2),
                  rngs = Random.Xoshiro.(sampler.seed),
                  draws_initializer = :stan,
-                 stepsize_adapter = StepsizeDualAverage(ones(sampler.chains)),
+                 stepsize_adapter = StepsizeDualAverage(sampler.stepsize),
                  trajectorylength_adapter = TrajectorylengthConstant(zeros(sampler.chains)),
-                 metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
+                 metric_adapter = MetricOnlineMoments(sampler.metric),
                  adaptation_schedule = WindowedAdaptationSchedule(warmup),
                  kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup

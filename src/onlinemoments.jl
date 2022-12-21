@@ -1,4 +1,3 @@
-# TODO adapt to matrix metric
 struct OnlineMoments{T <: AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
@@ -53,7 +52,7 @@ function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
     end
 end
 
-function reset!(om::OnlineMoments)
+function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
     om.v .= 0

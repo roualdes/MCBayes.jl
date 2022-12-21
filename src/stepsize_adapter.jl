@@ -28,7 +28,7 @@ function update!(ssa::StepsizeAdam, αs; γ = -0.6, kwargs...)
     @. ssa.stepsize_bar = exp(w * log(ssa.stepsize) + (1 - w) * log(1e-10 + ssa.stepsize_bar))
 end
 
-function optimum(ssa::AbstractStepsizeAdapter)
+function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
     return ssa.stepsize_bar
 end
 
@@ -36,7 +36,7 @@ function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; kwargs...)
     sampler.stepsize .= optimum(ssa)
 end
 
-function reset!(ssa::StepsizeAdam)
+function reset!(ssa::StepsizeAdam; kwargs...)
     reset!(ssa.adam; initial_stepsize = ssa.initial_stepsize)
     ssa.stepsize .= 0
     ssa.stepsize_bar .= 0

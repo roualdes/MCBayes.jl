@@ -6,9 +6,10 @@ using LinearAlgebra
 include("windowedadaptation.jl")
 include("dualaverage.jl")
 include("adam.jl")
+include("onlinemoments.jl")
 include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
-include("onlinemoments.jl")
+include("metric_adapter.jl")
 include("initialize_draws.jl")
 include("initialize_stepsize.jl")
 include("stan.jl")
@@ -25,6 +26,8 @@ export
     StepsizeAdam,
     StepsizeDualAverage,
     StepsizeConstant,
+    MetricOnlineMoments,
+    MetricConstant,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
 
