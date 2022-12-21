@@ -40,7 +40,7 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                  kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
     draws = Array{T, 3}(undef, M + 1, sampler.dims, sampler.chains)
-    momenta = randn(T, sampler.dims, sampler.chains) .* optimum(metric_adapter)
+    momenta = randn(T, sampler.dims, sampler.chains) .* sampler.metric
     acceptance_probabilities = rand(sampler.chains)
     diagnostics = trace(sampler, M)
 
@@ -313,6 +313,10 @@ function adapt!(sampler,
         update!(stepsize_adapter, accept_stats; warmup, kwargs...)
         set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
+        # TODO(ear) this is attempting to plan ahead;
+        # to actually use update!() will require
+        # more arguments, for additional information on which
+        # the trajectorylength could be learned
         update!(trajectorylength_adapter; kwargs...)
         set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
 
@@ -321,12 +325,16 @@ function adapt!(sampler,
         end
 
         if m == schedule.closewindow
-            @views initialize_stepsize!(stepsize_adapter, optimum(metric_adapter), rngs, ldg, draws[m + 1, :, :]; kwargs...)
+            @views initialize_stepsize!(stepsize_adapter,
+                                        optimum(metric_adapter),
+                                        rngs, ldg, draws[m + 1, :, :]; kwargs...)
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter)
 
             set_metric!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
+
+            calculate_nextwindow!(schedule)
         end
     else
         set_stepsize!(sampler, stepsize_adapter; kwargs...)

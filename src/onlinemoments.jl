@@ -68,15 +68,3 @@ function optimum(om::OnlineMoments; regularized = true, kwargs...)
     end
     return v
 end
-
-# probably need to wrap OnlineMoments in MetricAdapater,
-# so as to enable MetricConstant, but also don't want to
-# duplicate om.v into MetricAdapter...?
-
-function optimum(om::NamedTuple; regularized = true, kwargs...)
-    return om.metric
-end
-
-function set_metric!(sampler, adapter; kwargs...)
-    sampler.metric .= optimum(adapter; kwargs...)
-end

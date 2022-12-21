@@ -35,7 +35,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     isnan(H) && (H = typemin(T))
 
     ΔH = H - H0
-    dh = convert(T, -log(0.8))::T
+    dh = convert(T, log(0.8))::T
     direction = ΔH > dh ? 1 : -1
 
     while true
