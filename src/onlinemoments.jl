@@ -31,7 +31,7 @@ latter case, all columns of x will be used to update the same moments
 om.m and om.v.
 
 """
-function update!(om::OnlineMoments, x::Matrix; kwargs...)
+function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
     dims, chains = size(x)
     d, metrics = size(om.m)
 
@@ -45,8 +45,8 @@ function update!(om::OnlineMoments, x::Matrix; kwargs...)
 
     for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
         om.n[metric] += 1
-        m = x[:, chain] .- om.m[:, metric]
-        v = -om.v[:, metric]
+        @views m = x[:, chain] .- om.m[:, metric]
+        @views v = -om.v[:, metric]
         w = 1 / om.n[metric]
         @. om.m[:, metric] += m * w
         @. om.v[:, metric] += v * w + m ^ 2 * w * (1 - w)

@@ -1,8 +1,4 @@
-function integrate!(method::Symbol, position, momentum, ldg, gradient, stepsize, steps; kwargs...)
-    integrate!(Val{method}(), position, momentum, ldg, gradient, stepsize, steps; kwargs...)
-end
-
-function integrate!(::Val{:leapfrog}, position, momentum, ldg, gradient, stepsize, steps;
+function leapfrog!(position, momentum, ldg, gradient, stepsize, steps;
                     kwargs...)
     ld = zero(eltype(stepsize))
     @. momentum += stepsize * gradient / 2

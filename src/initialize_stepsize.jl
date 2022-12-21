@@ -9,12 +9,12 @@ end
 function init_stepsize!(::Val{:stan}, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
     stepsize = stepsize_adapter.initial_stepsize
     for chain in axes(draws, 3)
-        stepsize_adapter.stepsize[chain] = stan_init_stepsize(stepsize[chain],
-                                                              metric[:, chain],
-                                                              rng[chain],
-                                                              ldg,
-                                                              draws[1, :, chain];
-                                                              kwargs...)
+        @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(stepsize[chain],
+                                                                     metric[:, chain],
+                                                                     rng[chain],
+                                                                     ldg,
+                                                                     draws[1, :, chain];
+                                                                     kwargs...)
     end
 end
 
@@ -24,28 +24,28 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     q = copy(position)
     momentum = rand_momentum(rng, dims, metric)
 
-    ld, gradient = ldg(position; kwargs...)
+    ld, gradient = ldg(q; kwargs...)
     H0 = hamiltonian(ld, momentum, metric)
 
-    integrator = get(kwargs, :integrator, :leapfrog)
-    ld, gradient = integrate!(integrator, position, momentum, ldg, gradient, stepsize .* metric, 1)
-    H = hamiltonian(ld, momentum, metric) # TODO see next TODO about negatives; re bridgestan
-    isnan(H) && (H = typemin(T)) # TODO typemin(T), I think, when using bridgestan
+    # integrator = get(kwargs, :integrator, :leapfrog)
+    ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1)
+    H = hamiltonian(ld, momentum, metric)
+    isnan(H) && (H = typemin(T))
 
-    ΔH = H0 - H
+    ΔH = H - H0
     dh = convert(T, log(0.8))::T
     direction = ΔH > dh ? 1 : -1
 
     while true
         momentum .= rand_momentum(rng, dims, metric)
         H0 = hamiltonian(ld, momentum, metric)
-        position .= q
+        q .= position
 
-        ld, gradient = integrate!(integrator, position, momentum, ldg, gradient, stepsize .* metric, 1)
+        ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1)
         H = hamiltonian(ld, momentum, metric)
         isnan(H) && (H = typemin(T))
 
-        ΔH = H0 - H
+        ΔH = H - H0
         if direction == 1 && !(ΔH > dh)
             break
         elseif direction == -1 && !(ΔH < dh)
@@ -64,31 +64,31 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     return stepsize
 end
 
-function initialize_stepsize!(::Val{:adam}, adapter, metric, rng, ldg,
-                              draws::Array; kwargs...)
-    # TODO need do anything here?
-end
+# function initialize_stepsize!(::Val{:adam}, adapter, metric, rng, ldg,
+#                               draws::Array; kwargs...)
+#     # TODO need do anything here?
+# end
 
-# TODO needs a second look
-function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg, draws; kwargs...)
-    T = eltype(draws[1][1][1])
-    chains = length(draws[1])
-    num_metrics = size(metrics, 2)
+# # TODO needs a second look
+# function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg, draws; kwargs...)
+#     T = eltype(draws[1][1][1])
+#     chains = length(draws[1])
+#     num_metrics = size(metrics, 2)
 
-    αs = zeros(T, chains)
-    ε = 2 * one(T)
-    harmonic_mean = zero(T)
-    tmp = similar(draws[1][1])
+#     αs = zeros(T, chains)
+#     ε = 2 * one(T)
+#     harmonic_mean = zero(T)
+#     tmp = similar(draws[1][1])
 
-    while harmonic_mean < oftype(x, 0.5)
-        ε /= 2
+#     while harmonic_mean < oftype(x, 0.5)
+#         ε /= 2
 
-        for (metric, chain) in zip(Iterators.cylce(1:metrics), 1:chains)
-            # TODO keep, if this is needed. Otherwise, ditch. adapter.ε = ε
-            # TODO info = hmc!()
-            αs[chain] = info.acceptstat
-        end
-        harmonic_mean = inv(mean(inv, αs))
-    end
-    adapter.ε = ε
-end
+#         for (metric, chain) in zip(Iterators.cylce(1:metrics), 1:chains)
+#             # TODO keep, if this is needed. Otherwise, ditch. adapter.ε = ε
+#             # TODO info = hmc!()
+#             αs[chain] = info.acceptstat
+#         end
+#         harmonic_mean = inv(mean(inv, αs))
+#     end
+#     adapter.ε = ε
+# end

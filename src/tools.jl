@@ -68,7 +68,7 @@ function rand_momentum(rng, dims, metric)
 end
 
 function hamiltonian(ld, momenta, metric)
-    return -ld + dot(momenta, Diagonal(metric), momenta) / 2
+    return ld - dot(momenta, Diagonal(metric), momenta) / 2
 end
 
 function log1pexp(a)

@@ -66,11 +66,8 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                     ldg,
                     draws,
                     rngs,
-                    momenta,
-                    optimum(metric_adapter),
-                    optimum(stepsize_adapter),
-                    acceptance_probabilities,
                     diagnostics;
+                    integrator,
                     kwargs...)
 
         adapt!(sampler,
@@ -88,14 +85,14 @@ function sample!(sampler::AbstractSampler{T}, ldg;
     return draws, diagnostics
 end
 
-function transition!(sampler::Stan, m, ldg, draws, rngs, momenta, metric, stepsize, acceptance_probabilities, trace; kwargs...)
+function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
     for chain in axes(draws, 3) # TODO multi-thread-able
-        metric = sampler.metric[:, chain]
+        @views metric = sampler.metric[:, chain]
         stepsize = sampler.stepsize[chain]
-        info = stan_kernel!(draws[m, :, chain], rngs[chain], sampler.dims, metric, stepsize,
+        @views info = stan_kernel!(draws[m, :, chain], rngs[chain], sampler.dims, metric, stepsize,
                             sampler.maxdeltaH, sampler.maxtreedepth, ldg; kwargs...)
         draws[m + 1, :, chain] = info.position_next
-        store!(trace, info, m, chain)
+        record!(trace, info, m, chain)
     end
 end
 
@@ -225,18 +222,17 @@ function buildtree!(depth, z, zpropose, metric, rng,
     if iszero(depth)
 
         ld, gradient = ldg(z.position; kwargs...)
-        integrator = get(kwargs, :integrator, :leapfrog)
-        ld, gradient = integrate!(integrator, z.position, z.momentum, ldg, gradient,
-                                  direction .* stepsize .* metric, 1)
+        ld, gradient = leapfrog!(z.position, z.momentum, ldg, gradient,
+                                 direction .* stepsize .* metric, 1)
 
         nleapfrog += 1
         zpropose .= z
 
         H = hamiltonian(ld, z.momentum, metric)
         isnan(H) && (H = typemin(T))
-        divergent = divergence(H, H0, maxdeltaH)
+        divergent = divergence(H0, H, maxdeltaH)
 
-        Δ = H0 - H
+        Δ = H - H0
         logsumweight = logsumexp(logsumweight, Δ)
         α += Δ > zero(Δ) ? one(Δ) : exp(Δ)
 
@@ -316,7 +312,7 @@ function adapt!(sampler,
                 metric_adapter, stepsize_adapter, trajectorylength_adapter; kwargs...)
     warmup = schedule.warmup
     if m <= warmup
-        accept_stats = trace.acceptstat[m, :]
+        @views accept_stats = trace.acceptstat[m, :]
         update!(stepsize_adapter, accept_stats; warmup, kwargs...)
         set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
@@ -324,11 +320,11 @@ function adapt!(sampler,
         set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
-            update!(metric_adapter, draws[m, :, :]; kwargs...)
+            @views update!(metric_adapter, draws[m + 1, :, :]; kwargs...)
         end
 
         if m == schedule.closewindow
-            initialize_stepsize!(stepsize_adapter, sampler.metric, rngs, ldg, draws; kwargs...)
+            initialize_stepsize!(stepsize_adapter, optimum(metric_adapter), rngs, ldg, draws; kwargs...)
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter)
 

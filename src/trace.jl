@@ -11,7 +11,7 @@ function trace(sampler::Stan{T}, iterations) where {T}
             )
 end
 
-function store!(trace::NamedTuple, info, iteration, chain)
+function record!(trace::NamedTuple, info, iteration, chain)
     keys = (
         :accepted,
         :divergence,

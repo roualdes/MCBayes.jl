@@ -41,21 +41,20 @@ function stan_initialize_draw(position, ldg, rng;
 end
 
 # TODO needs a second look
-function initialize_draws!(::Val{:sga}, draws, rng, ldg;
-                           steps = 100,
-                           initialize_draws_adam = Adam(),
-                           number_threads = Threads.nthreads(),
-                           kwargs...)
-    chains = size(draws, 3)
-    @sync for it in 1:number_threads
-        Threads.@spawn for chain in it:number_threads:chains
-            for s in 1:steps
-                _ = ldg(draws[1, :, chain], gradients[:, chain])
-                draws[1, :, chain] .-= update!(initialize_draws_adam, gradients[:, chain], s)
-            end
-        end
-    end
-end
+# function initialize_draws!(::Val{:sga}, draws, rng, ldg;
+#                            steps = 100,
+#                            number_threads = Threads.nthreads(),
+#                            kwargs...)
+#     chains = size(draws, 3)
+#     @sync for it in 1:number_threads
+#         Threads.@spawn for chain in it:number_threads:chains
+#             for s in 1:steps
+#                 _ = ldg(draws[1, :, chain], gradients[:, chain])
+#                 draws[1, :, chain] .-= update!(initialize_draws_adam, gradients[:, chain], s)
+#             end
+#         end
+#     end
+# end
 
 function initialize_draws!(::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...)
     if haskey(kwargs, :initial_draw)
