@@ -59,7 +59,7 @@ function reset!(om::OnlineMoments)
     om.v .= 0
 end
 
-function optimum(om::OnlineMoments; regularized = true)
+function optimum(om::OnlineMoments; regularized = true, kwargs...)
     T = eltype(om.v)
     v = if regularized
         w = convert.(T, om.n ./ (om.n .+ 5))
@@ -74,7 +74,7 @@ end
 # so as to enable MetricConstant, but also don't want to
 # duplicate om.v into MetricAdapter...?
 
-function optimum(om::NamedTuple; regularized = true)
+function optimum(om::NamedTuple; regularized = true, kwargs...)
     return om.metric
 end
 

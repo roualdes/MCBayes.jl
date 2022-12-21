@@ -74,19 +74,19 @@ function reset!(ssa::StepsizeDualAverage)
 end
 
 struct StepsizeConstant{T <: AbstractFloat} <: AbstractStepsizeAdapter
+    initial_stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
 end
 
 function StepsizeConstant(initial_stepsize::Vector{T};
-                          initializer = :stan, kwargs...) where {T <: AbstractFloat}
+                          initializer = :none, kwargs...) where {T <: AbstractFloat}
     chains = length(initial_stepsize)
-    da = DualAverage(chains; kwargs...)
-    return StepsizeDualAverage(da, initial_stepsize, initializer)
+    return StepsizeConstant(initial_stepsize, initial_stepsize, initializer)
 end
 
 function update!(ssc::StepsizeConstant, αs; kwargs...)
 end
 
-function reset!(ssc::StepsizeConstant, αs; kwargs...)
+function reset!(ssc::StepsizeConstant; kwargs...)
 end

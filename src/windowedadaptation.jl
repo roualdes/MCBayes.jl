@@ -20,5 +20,9 @@ end
 function calculate_nextwindow!(ws::WindowedAdaptationSchedule)
     ws.windowsize *= 2
     nextclosewindow = ws.closewindow + ws.windowsize
-    ws.closewindow = min(nextclosewindow, ws.lastwindow)
+    ws.closewindow = if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
+        ws.lastwindow
+        else
+        min(nextclosewindow, ws.lastwindow)
+    end
 end

@@ -37,7 +37,6 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                  trajectorylength_adapter = TrajectorylengthConstant(zeros(sampler.chains)),
                  metric_adapter = OnlineMoments(T, sampler.dims, sampler.chains),
                  adaptation_schedule = WindowedAdaptationSchedule(warmup),
-                 integrator = :leapfrog,
                  kwargs...) where {T <: AbstractFloat}
     M = iterations + warmup
     draws = Array{T, 3}(undef, M + 1, sampler.dims, sampler.chains)
@@ -51,13 +50,12 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                       ldg;
                       kwargs...)
 
-    initialize_stepsize!(stepsize_adapter,
-                         sampler.metric,
-                         rngs,
-                         ldg,
-                         draws;
-                         integrator,
-                         kwargs...)
+    @views initialize_stepsize!(stepsize_adapter,
+                                sampler.metric,
+                                rngs,
+                                ldg,
+                                draws[1, :, :];
+                                kwargs...)
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
     for m in 1:M
@@ -67,7 +65,6 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                     draws,
                     rngs,
                     diagnostics;
-                    integrator,
                     kwargs...)
 
         adapt!(sampler,
@@ -79,7 +76,7 @@ function sample!(sampler::AbstractSampler{T}, ldg;
                rngs,
                metric_adapter,
                stepsize_adapter,
-               trajectorylength_adapter,
+               trajectorylength_adapter;
                kwargs...)
     end
     return draws, diagnostics
@@ -223,7 +220,7 @@ function buildtree!(depth, z, zpropose, metric, rng,
 
         ld, gradient = ldg(z.position; kwargs...)
         ld, gradient = leapfrog!(z.position, z.momentum, ldg, gradient,
-                                 direction .* stepsize .* metric, 1)
+                                 direction .* stepsize .* metric, 1; kwargs...)
 
         nleapfrog += 1
         zpropose .= z
@@ -255,7 +252,7 @@ function buildtree!(depth, z, zpropose, metric, rng,
     validinit, nleapfrog, lswinit, α =
         buildtree!(depth - one(depth), z, zpropose, metric, rng,
                    psharpbeg, psharpinitend, rhoinit, pbeg, pinitend,
-                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswinit, α)
+                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswinit, α; kwargs...)
 
     if !validinit
         return validinit, nleapfrog, logsumweight, α
@@ -271,7 +268,7 @@ function buildtree!(depth, z, zpropose, metric, rng,
     validfinal, nleapfrog, lswfinal, α =
         buildtree!(depth - one(depth), z, zfinalpr, metric, rng,
                    psharpfinalbeg, psharpend, rhofinal, pfinalbeg, pend,
-                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswfinal, α)
+                   H0, direction, stepsize, maxdeltaH, ldg, nleapfrog, lswfinal, α; kwargs...)
 
     if !validfinal
         return validfinal, nleapfrog, logsumweight, α
@@ -324,12 +321,14 @@ function adapt!(sampler,
         end
 
         if m == schedule.closewindow
-            initialize_stepsize!(stepsize_adapter, optimum(metric_adapter), rngs, ldg, draws; kwargs...)
+            @views initialize_stepsize!(stepsize_adapter, optimum(metric_adapter), rngs, ldg, draws[m + 1, :, :]; kwargs...)
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter)
 
             set_metric!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
         end
+    else
+        set_stepsize!(sampler, stepsize_adapter; kwargs...)
     end
 end

@@ -1,20 +1,23 @@
-function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, draws; kwargs...)
-    init_stepsize!(stepsize_adapter.initializer, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, positions; kwargs...)
+    init_stepsize!(stepsize_adapter.initializer, stepsize_adapter, metric, rng, ldg, positions; kwargs...)
 end
 
-function init_stepsize!(method::Symbol, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
-    init_stepsize!(Val{method}(), stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+function init_stepsize!(method::Symbol, stepsize_adapter, metric, rng, ldg, positions; kwargs...)
+    init_stepsize!(Val{method}(), stepsize_adapter, metric, rng, ldg, positions; kwargs...)
 end
 
-function init_stepsize!(::Val{:stan}, stepsize_adapter, metric, rng, ldg, draws; kwargs...)
+function init_stepsize!(::Val{:none}, stepsize_adapter, metric, rng, ldg, positions; kwargs...)
+end
+
+function init_stepsize!(::Val{:stan}, stepsize_adapter, metric, rng, ldg, positions; kwargs...)
     stepsize = stepsize_adapter.initial_stepsize
-    for chain in axes(draws, 3)
-        @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(stepsize[chain],
-                                                                     metric[:, chain],
-                                                                     rng[chain],
-                                                                     ldg,
-                                                                     draws[1, :, chain];
-                                                                     kwargs...)
+    for chain in axes(positions, 2)
+        @views stepsize_adapter.stepsize_bar[chain] = stan_init_stepsize(stepsize[chain],
+                                                                         metric[:, chain],
+                                                                         rng[chain],
+                                                                         ldg,
+                                                                         positions[:, chain];
+                                                                         kwargs...)
     end
 end
 
@@ -27,13 +30,12 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     ld, gradient = ldg(q; kwargs...)
     H0 = hamiltonian(ld, momentum, metric)
 
-    # integrator = get(kwargs, :integrator, :leapfrog)
-    ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1)
+    ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...)
     H = hamiltonian(ld, momentum, metric)
     isnan(H) && (H = typemin(T))
 
     ΔH = H - H0
-    dh = convert(T, log(0.8))::T
+    dh = convert(T, -log(0.8))::T
     direction = ΔH > dh ? 1 : -1
 
     while true
@@ -41,7 +43,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
         H0 = hamiltonian(ld, momentum, metric)
         q .= position
 
-        ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1)
+        ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...)
         H = hamiltonian(ld, momentum, metric)
         isnan(H) && (H = typemin(T))
 
