@@ -39,8 +39,6 @@ function sample!(
 ) where {T<:AbstractFloat}
     M = iterations + warmup
     draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
-    momenta = randn(T, sampler.dims, sampler.chains) .* sampler.metric
-    acceptance_probabilities = rand(sampler.chains)
     diagnostics = trace(sampler, M)
 
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
@@ -85,7 +83,7 @@ function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
             ldg;
             kwargs...,
         )
-        draws[m + 1, :, chain] = info.position_next
+        draws[m + 1, :, chain] .= info.position_next
         record!(trace, info, m, chain)
     end
 end
@@ -302,7 +300,7 @@ function buildtree!(
     rhoinit = zero(rho)
 
     validinit, nleapfrog, lswinit, α = buildtree!(
-        depth - one(depth),
+        depth - 1,
         z,
         zpropose,
         metric,
@@ -335,7 +333,7 @@ function buildtree!(
     rhofinal = zero(rho)
 
     validfinal, nleapfrog, lswfinal, α = buildtree!(
-        depth - one(depth),
+        depth - 1,
         z,
         zfinalpr,
         metric,
@@ -428,7 +426,7 @@ function adapt!(
                 kwargs...,
             )
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
-            reset!(stepsize_adapter)
+            reset!(stepsize_adapter; initial_stepsize = sampler.stepsize)
 
             set_metric!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)

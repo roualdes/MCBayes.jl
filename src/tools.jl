@@ -10,14 +10,15 @@ function hmc!(
     maxdeltaH;
     kwargs...,
 )
+    # TODO(ear) needs updating to current interface
     T = eltype(position)
     next_position .= position
 
-    lp = ldg(position, gradient; kwargs...)
+    lp, gradient = ldg(position; kwargs...)
     H1 = hamiltonian(lp, momenta)
     isnan(H1) && (H1 = typemin(T))
 
-    integrate!(integrator, ldg, position, momenta, gradient, stepsize, steps; kwargs...)
+    integrate!(ldg, position, momenta, gradient, stepsize, steps; kwargs...)
 
     H2 = hamiltonian(lp, momenta)
     isnan(H2) && (H2 = typemin(T))
@@ -44,6 +45,7 @@ function pghmc!(
     maxdeltaH;
     kwargs...,
 )
+    # TODO(ear) needs updating to current interface
     T = eltype(position)
     next_position .= position
     next_momenta .= momenta
@@ -107,7 +109,7 @@ function logsumexp(v::AbstractVector)
 end
 
 function divergence(H, H0, limit)
-    return H - H0 > limit
+    return H - H0 < -limit
 end
 
 function stancriterion(pbeg, pend, rho)

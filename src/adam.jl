@@ -34,7 +34,7 @@ function update!(adm::Adam, g, t; kwargs...)
     return a * adm.m / (sqrt(adm.v) + adm.ι)
 end
 
-function reset!(adm::Adam; initial_stepsize=1)
+function reset!(adm::Adam; initial_stepsize=1, kwargs...)
     adm.m .= 0
     return adm.v .= 0
 end

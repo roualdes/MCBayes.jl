@@ -33,13 +33,13 @@ function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
 end
 
 function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; kwargs...)
-    return sampler.stepsize .= optimum(ssa)
+    sampler.stepsize .= optimum(ssa)
 end
 
 function reset!(ssa::StepsizeAdam; kwargs...)
-    reset!(ssa.adam; initial_stepsize=ssa.initial_stepsize)
+    reset!(ssa.adam; initial_stepsize=ssa.initial_stepsize, kwargs...)
     ssa.stepsize .= 0
-    return ssa.stepsize_bar .= 0
+    ssa.stepsize_bar .= 0
 end
 
 struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter
@@ -63,11 +63,11 @@ end
 function update!(ssa::StepsizeDualAverage, αs; kwargs...)
     ss, ssbar = update!(ssa.da, αs; kwargs...)
     ssa.stepsize .= ss
-    return ssa.stepsize_bar .= ssbar
+    ssa.stepsize_bar .= ssbar
 end
 
-function reset!(ssa::StepsizeDualAverage)
-    reset!(ssa.da; initial_stepsize=ssa.initial_stepsize)
+function reset!(ssa::StepsizeDualAverage; kwargs...)
+    reset!(ssa.da; initial_stepsize=ssa.initial_stepsize, kwargs...)
     ssa.stepsize .= 0
     return ssa.stepsize_bar .= 0
 end

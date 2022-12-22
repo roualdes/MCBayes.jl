@@ -57,16 +57,20 @@ end
 function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
-    return om.v .= 0
+    om.v .= 0
 end
 
 function optimum(om::OnlineMoments; regularized=true, kwargs...)
     T = eltype(om.v)
-    v = if regularized
-        w = convert.(T, om.n ./ (om.n .+ 5))
-        @. w' * om.v + (1 - w') * convert(T, 1e-3)
+    if om.n[1] > 1
+        v = if regularized
+            w = convert.(T, om.n ./ (om.n .+ 5))
+            @. w' * om.v + (1 - w') * convert(T, 1e-3)
+        else
+            om.v
+        end
+        return v
     else
-        om.v
+        return ones(T, size(om.v))
     end
-    return v
 end
