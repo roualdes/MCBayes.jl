@@ -1,5 +1,4 @@
-function leapfrog!(position, momentum, ldg, gradient, stepsize, steps;
-                    kwargs...)
+function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...)
     ld = zero(eltype(stepsize))
     @. momentum += stepsize * gradient / 2
 

@@ -1,18 +1,16 @@
 function initialize_draws!(method::Symbol, draws, rng, ldg; kwargs...)
-    initialize_draws!(Val{method}(), draws, rng, ldg; kwargs...)
+    return initialize_draws!(Val{method}(), draws, rng, ldg; kwargs...)
 end
 
 function initialize_draws!(::Val{:stan}, draws, rng, ldg; kwargs...)
     for chain in axes(draws, 3)
-        draws[1, :, chain] = stan_initialize_draw(draws[1, :, chain],
-                                                  ldg,
-                                                  rng[chain];
-                                                  kwargs...)
+        draws[1, :, chain] = stan_initialize_draw(
+            draws[1, :, chain], ldg, rng[chain]; kwargs...
+        )
     end
 end
 
-function stan_initialize_draw(position, ldg, rng;
-                               radius = 2, attempts = 100, kwargs...)
+function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs...)
     initialized = false
     a = 0
     T = eltype(position)
@@ -56,12 +54,16 @@ end
 #     end
 # end
 
-function initialize_draws!(::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...)
+function initialize_draws!(
+    ::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...
+)
     if haskey(kwargs, :initial_draw)
         draws[1, :, :] .= initial_draw
     else
         _, dims, chains = size(draws)
-        error("With draws_initializer = :none, " *
-            "supply initial_draw with dimensions $dims by $chains")
+        error(
+            "With draws_initializer = :none, " *
+            "supply initial_draw with dimensions $dims by $chains",
+        )
     end
 end

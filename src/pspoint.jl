@@ -1,7 +1,7 @@
 """
 Point in general phase space.
 """
-struct PSPoint{T <: AbstractFloat} <: AbstractArray{T, 1}
+struct PSPoint{T<:AbstractFloat} <: AbstractArray{T,1}
     position::Vector{T}
     momentum::Vector{T}
     function PSPoint(position, momentum)
@@ -9,7 +9,7 @@ struct PSPoint{T <: AbstractFloat} <: AbstractArray{T, 1}
         if length(position) != length(momentum) || T != eltype(momentum)
             error("position and momentum must have same length and type")
         end
-        new{T}(position, momentum)
+        return new{T}(position, momentum)
     end
 end
 

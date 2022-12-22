@@ -1,4 +1,4 @@
-struct DualAverage{T <: AbstractFloat}
+struct DualAverage{T<:AbstractFloat}
     sbar::Vector{T}
     xbar::Vector{T}
     μ::Vector{T}
@@ -9,21 +9,18 @@ struct DualAverage{T <: AbstractFloat}
     counter::Vector{Int}
 end
 
-function DualAverage(chains;
-                     μ = log(10 * 1.0),
-                     δ = 0.8,
-                     γ = 0.05,
-                     t0 = 10.0,
-                     κ = 0.75)
+function DualAverage(chains; μ=log(10 * 1.0), δ=0.8, γ=0.05, t0=10.0, κ=0.75)
     T = eltype(μ)
-    return DualAverage(zeros(T, chains),
-                       zeros(T, chains),
-                       μ .* ones(T, chains),
-                       γ .* ones(T, chains),
-                       δ .* ones(T, chains),
-                       κ .* ones(T, chains),
-                       t0 .* ones(T, chains),
-                       zeros(Int, chains))
+    return DualAverage(
+        zeros(T, chains),
+        zeros(T, chains),
+        μ .* ones(T, chains),
+        γ .* ones(T, chains),
+        δ .* ones(T, chains),
+        κ .* ones(T, chains),
+        t0 .* ones(T, chains),
+        zeros(Int, chains),
+    )
 end
 
 function update!(da::DualAverage, αs; kwargs...)
@@ -37,11 +34,11 @@ function update!(da::DualAverage, αs; kwargs...)
     return exp.(x), exp.(da.xbar)
 end
 
-function reset!(da::DualAverage; initial_stepsize = 1)
+function reset!(da::DualAverage; initial_stepsize=1)
     @. da.μ = log(10 * oftype(da.μ, initial_stepsize))
     da.sbar .= 0
     da.xbar .= 0
-    da.counter .= 0
+    return da.counter .= 0
 end
 
 function optimum(da::DualAverage)

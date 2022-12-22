@@ -1,5 +1,15 @@
-function hmc!(integrator, next_position, position, momenta, ldg, gradient, stepsize, steps, maxdeltaH;
-              kwargs...)
+function hmc!(
+    integrator,
+    next_position,
+    position,
+    momenta,
+    ldg,
+    gradient,
+    stepsize,
+    steps,
+    maxdeltaH;
+    kwargs...,
+)
     T = eltype(position)
     next_position .= position
 
@@ -17,15 +27,23 @@ function hmc!(integrator, next_position, position, momenta, ldg, gradient, steps
     accepted = rand(rng, T) < a
     accepted && (next_position .= position)
 
-    return (;
-            accepted,
-            divergent,
-            acceptstat = a
-            )
+    return (; accepted, divergent, acceptstat=a)
 end
 
-function pghmc!(integrator, next_position, position, momenta, ldg, gradient, stepsize, acceptance_probability, δ, nonreversible_update, maxdeltaH;
-                kwargs...)
+function pghmc!(
+    integrator,
+    next_position,
+    position,
+    momenta,
+    ldg,
+    gradient,
+    stepsize,
+    acceptance_probability,
+    δ,
+    nonreversible_update,
+    maxdeltaH;
+    kwargs...,
+)
     T = eltype(position)
     next_position .= position
     next_momenta .= momenta
@@ -41,7 +59,7 @@ function pghmc!(integrator, next_position, position, momenta, ldg, gradient, ste
     divergent = divergence(H2, H1, maxdeltaH)
 
     a = H1 + H2
-    accepted =  log(abs(acceptance_probability)) < a
+    accepted = log(abs(acceptance_probability)) < a
     if accepted
         next_position .= position
         next_momenta .= momenta
@@ -56,11 +74,7 @@ function pghmc!(integrator, next_position, position, momenta, ldg, gradient, ste
         rand(rng, T)
     end
 
-    return (;
-            accepted,
-            divergent,
-            acceptstat = abs(acceptance_probability)
-            )
+    return (; accepted, divergent, acceptstat=abs(acceptance_probability))
 end
 
 function rand_momentum(rng, dims, metric)

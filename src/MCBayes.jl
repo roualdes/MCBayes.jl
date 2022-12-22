@@ -18,9 +18,7 @@ include("integrator.jl")
 include("pspoint.jl")
 include("trace.jl")
 
-export
-    Stan,
-
+export Stan,
     Adam,
     OnlineMoments,
     StepsizeAdam,
@@ -30,9 +28,7 @@ export
     MetricConstant,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
-
     sample!,
-
     optimum
 
 end

@@ -1,13 +1,11 @@
-struct OnlineMoments{T <: AbstractFloat}
+struct OnlineMoments{T<:AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
     v::Matrix{T}
 end
 
 function OnlineMoments(T, d, c)
-    return OnlineMoments(zeros(Int, c),
-                         zeros(T, d, c),
-                         zeros(T, d, c))
+    return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
 end
 
 """
@@ -18,7 +16,7 @@ size (d, c). When `update!(om::OnlineMoments, x::Matrix)` is called, update
 determines whether or not any updates will actually be applied.
 
 """
-OnlineMoments(d, c = 1) = OnlineMoments(Float64, d, c)
+OnlineMoments(d, c=1) = OnlineMoments(Float64, d, c)
 
 """
     update!(om::OnlineMoments, x::Matrix; kwargs...)
@@ -39,7 +37,11 @@ function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
     end
 
     if chains != metrics && metrics != 1
-        throw(DimensionMismatch("size(x, 2) should equal size(om.m, 2) == $metrics or equal 1"))
+        throw(
+            DimensionMismatch(
+                "size(x, 2) should equal size(om.m, 2) == $metrics or equal 1"
+            ),
+        )
     end
 
     for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
@@ -48,17 +50,17 @@ function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
         @views v = -om.v[:, metric]
         w = 1 / om.n[metric]
         @. om.m[:, metric] += m * w
-        @. om.v[:, metric] += v * w + m ^ 2 * w * (1 - w)
+        @. om.v[:, metric] += v * w + m^2 * w * (1 - w)
     end
 end
 
 function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
-    om.v .= 0
+    return om.v .= 0
 end
 
-function optimum(om::OnlineMoments; regularized = true, kwargs...)
+function optimum(om::OnlineMoments; regularized=true, kwargs...)
     T = eltype(om.v)
     v = if regularized
         w = convert.(T, om.n ./ (om.n .+ 5))
