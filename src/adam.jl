@@ -36,7 +36,7 @@ end
 
 function reset!(adm::Adam; initial_stepsize=1, kwargs...)
     adm.m .= 0
-    return adm.v .= 0
+    adm.v .= 0
 end
 
 function learningrate(schedule::Symbol, i, initialvalue, decaysteps)

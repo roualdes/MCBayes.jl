@@ -2,7 +2,7 @@ abstract type AbstractMetricAdapter end
 
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter
     om::OnlineMoments{T}
-    initial_metric::Matrix{T}
+    metric::Matrix{T}
 end
 
 function set_metric!(sampler, ma::AbstractMetricAdapter; kwargs...)
@@ -28,7 +28,7 @@ function reset!(mom::MetricOnlineMoments; kwargs...)
 end
 
 struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter
-    initial_metric::Matrix{T}
+    metric::Matrix{T}
 end
 
 function MetricConstant(initial_metric::Matrix{T}; kwargs...) where {T}
@@ -38,7 +38,7 @@ end
 function update!(mc::MetricConstant, x::AbstractMatrix; kwargs...) end
 
 function optimum(mc::MetricConstant; kwargs...)
-    return mc.initial_metric
+    return mc.metric
 end
 
 function reset!(mc::MetricConstant; kwargs...) end

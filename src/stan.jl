@@ -27,8 +27,8 @@ end
 function sample!(
     sampler::AbstractSampler{T},
     ldg;
-    iterations=2000,
-    warmup=div(iterations, 2),
+    iterations=1000,
+    warmup=1000,
     rngs=Random.Xoshiro.(sampler.seed),
     draws_initializer=:stan,
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
@@ -88,13 +88,17 @@ function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
     end
 end
 
+function stancriterion(pbeg, pend, rho)
+    return dot(pbeg, rho) > 0 && dot(pend, rho) > 0
+end
+
 function stan_kernel!(
     position, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...
 )
     T = eltype(position)
-    z = PSPoint(position, rand_momentum(rng, dims, metric))
+    z = PSPoint(position, randn(rng, dims))
     ld, gradient = ldg(z.position; kwargs...)
-    H0 = hamiltonian(ld, z.momentum, metric)
+    H0 = hamiltonian(ld, z.momentum)
 
     zf = copy(z)
     zb = copy(z)
@@ -195,7 +199,7 @@ function stan_kernel!(
             divergence = true
             break
         end
-        depth += one(depth)
+        depth += 1
 
         if lswsubtree > lsw
             zsample .= zpr
@@ -231,7 +235,7 @@ function stan_kernel!(
         accepted,
         divergence,
         stepsize,
-        energy=hamiltonian(ld, zsample.momentum, metric),
+        energy=hamiltonian(ld, z.momentum),
         acceptstat=α / nleapfrog,
         treedepth=depth,
         leapfrog=nleapfrog,
@@ -275,11 +279,11 @@ function buildtree!(
         nleapfrog += 1
         zpropose .= z
 
-        H = hamiltonian(ld, z.momentum, metric)
-        isnan(H) && (H = typemin(T))
-        divergent = divergence(H0, H, maxdeltaH)
+        H = hamiltonian(ld, z.momentum)
+        isnan(H) && (H = typemax(T))
+        divergent = (H - H0) > maxdeltaH
 
-        Δ = H - H0
+        Δ = H0 - H
         logsumweight = logsumexp(logsumweight, Δ)
         α += Δ > zero(Δ) ? one(Δ) : exp(Δ)
 
@@ -426,7 +430,7 @@ function adapt!(
                 kwargs...,
             )
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
-            reset!(stepsize_adapter; initial_stepsize = sampler.stepsize)
+            reset!(stepsize_adapter; kwargs...)
 
             set_metric!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
@@ -434,6 +438,6 @@ function adapt!(
             calculate_nextwindow!(schedule)
         end
     else
-        set_stepsize!(sampler, stepsize_adapter; kwargs...)
+        set_stepsize!(sampler, stepsize_adapter; smoothed = true, kwargs...)
     end
 end

@@ -38,7 +38,7 @@ function reset!(da::DualAverage; initial_stepsize=1)
     @. da.μ = log(10 * oftype(da.μ, initial_stepsize))
     da.sbar .= 0
     da.xbar .= 0
-    return da.counter .= 0
+    da.counter .= 0
 end
 
 function optimum(da::DualAverage)

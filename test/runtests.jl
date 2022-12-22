@@ -20,8 +20,8 @@ using Statistics
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
     @test isapprox(optimum(om; regularized=false), om.v)
-    w = om.n ./ (om.n .+ 5)
-    v = @. w' * om.v + (1 - w') * 1e-3
+    w = reshape(om.n ./ (om.n .+ 5), 1, :)
+    v = @. w * om.v + (1 - w) * 1e-3
     @test isapprox(optimum(om), v)
 
     MCBayes.reset!(om)
@@ -43,8 +43,8 @@ using Statistics
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
     @test isapprox(optimum(om; regularized=false), om.v)
-    w = om.n ./ (om.n .+ 5)
-    v = @. w' * om.v + (1 - w') * 1e-3
+    w = reshape(om.n ./ (om.n .+ 5), 1, :)
+    v = @. w * om.v + (1 - w) * 1e-3
     @test isapprox(optimum(om), v)
 end
 

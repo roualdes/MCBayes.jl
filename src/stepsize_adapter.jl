@@ -2,7 +2,6 @@ abstract type AbstractStepsizeAdapter end
 
 struct StepsizeAdam{T<:AbstractFloat} <: AbstractStepsizeAdapter
     adam::Adam{T}
-    initial_stepsize::Vector{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
@@ -12,13 +11,14 @@ function StepsizeAdam(initial_stepsize::Vector{T}; initializer=:sga, kwargs...) 
     chains = length(initial_stepsize)
     adam = Adam(chains; kwargs...)
     return StepsizeAdam(
-        adam, initial_stepsize, zeros(T, chains), zeros(T, chains), initializer
+        adam, initial_stepsize, zeros(T, chains), initializer
     )
 end
 
 """
 Adam update on log-scale.
 """
+# TODO(ear) should smoothing go into Adam, like for DualAveraging?
 function update!(ssa::StepsizeAdam, αs; γ=-0.6, kwargs...)
     x = update!(ssa.adam, αs; kwargs...)
     @. ssa.stepsize *= exp(x)
@@ -32,19 +32,18 @@ function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
     return ssa.stepsize_bar
 end
 
-function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; kwargs...)
-    sampler.stepsize .= optimum(ssa)
+# TODO(ear) move smoothed into optimum(; kwargs...)
+function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed = false, kwargs...)
+    sampler.stepsize .= smoothed ? optimum(ssa) : ssa.stepsize
 end
 
 function reset!(ssa::StepsizeAdam; kwargs...)
-    reset!(ssa.adam; initial_stepsize=ssa.initial_stepsize, kwargs...)
-    ssa.stepsize .= 0
-    ssa.stepsize_bar .= 0
+    ss = ssa.stepsize_bar
+    reset!(ssa.adam; initial_stepsize=ss, kwargs...)
 end
 
 struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter
     da::DualAverage{T}
-    initial_stepsize::Vector{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
@@ -56,7 +55,7 @@ function StepsizeDualAverage(
     chains = length(initial_stepsize)
     da = DualAverage(chains; kwargs...)
     return StepsizeDualAverage(
-        da, initial_stepsize, zeros(T, chains), zeros(T, chains), initializer
+        da, initial_stepsize, zeros(T, chains), initializer
     )
 end
 
@@ -67,13 +66,12 @@ function update!(ssa::StepsizeDualAverage, αs; kwargs...)
 end
 
 function reset!(ssa::StepsizeDualAverage; kwargs...)
-    reset!(ssa.da; initial_stepsize=ssa.initial_stepsize, kwargs...)
-    ssa.stepsize .= 0
-    return ssa.stepsize_bar .= 0
+    ss = ssa.stepsize_bar
+    reset!(ssa.da; initial_stepsize=ss, kwargs...)
 end
 
 struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter
-    initial_stepsize::Vector{T}
+    stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
 end

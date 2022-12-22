@@ -84,7 +84,11 @@ function rand_momentum(rng, dims, metric)
 end
 
 function hamiltonian(ld, momenta, metric)
-    return ld - dot(momenta, Diagonal(metric), momenta) / 2
+    return -ld + dot(momenta, Diagonal(metric), momenta) / 2
+end
+
+function hamiltonian(ld, momenta)
+    return -ld + dot(momenta, momenta) / 2
 end
 
 function log1pexp(a)
@@ -106,12 +110,4 @@ function logsumexp(v::AbstractVector)
     m = maximum(v)
     isinf(m) && return m
     return m + log(sum(vi -> exp(vi - m), v))
-end
-
-function divergence(H, H0, limit)
-    return H - H0 < -limit
-end
-
-function stancriterion(pbeg, pend, rho)
-    return dot(pbeg, rho) > 0 && dot(pend, rho) > 0
 end

@@ -44,13 +44,12 @@ function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
         )
     end
 
-    for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
+    @views for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
         om.n[metric] += 1
-        @views m = x[:, chain] .- om.m[:, metric]
-        @views v = -om.v[:, metric]
+        m = x[:, chain] .- om.m[:, metric]
         w = 1 / om.n[metric]
         @. om.m[:, metric] += m * w
-        @. om.v[:, metric] += v * w + m^2 * w * (1 - w)
+        @. om.v[:, metric] += -om.v[:, metric] * w + m^2 * w * (1 - w)
     end
 end
 
@@ -64,8 +63,8 @@ function optimum(om::OnlineMoments; regularized=true, kwargs...)
     T = eltype(om.v)
     if om.n[1] > 1
         v = if regularized
-            w = convert.(T, om.n ./ (om.n .+ 5))
-            @. w' * om.v + (1 - w') * convert(T, 1e-3)
+            w = reshape(convert.(T, om.n ./ (om.n .+ 5)), 1, :)
+            @. w * om.v + (1 - w) * convert(T, 1e-3)
         else
             om.v
         end

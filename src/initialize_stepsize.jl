@@ -1,5 +1,5 @@
 function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, positions; kwargs...)
-    return init_stepsize!(
+    init_stepsize!(
         stepsize_adapter.initializer,
         stepsize_adapter,
         metric,
@@ -13,7 +13,7 @@ end
 function init_stepsize!(
     method::Symbol, stepsize_adapter, metric, rng, ldg, positions; kwargs...
 )
-    return init_stepsize!(
+    init_stepsize!(
         Val{method}(), stepsize_adapter, metric, rng, ldg, positions; kwargs...
     )
 end
@@ -25,9 +25,9 @@ function init_stepsize!(
 function init_stepsize!(
     ::Val{:stan}, stepsize_adapter, metric, rng, ldg, positions; kwargs...
 )
-    stepsize = stepsize_adapter.initial_stepsize
+    stepsize = stepsize_adapter.stepsize
     for chain in axes(positions, 2)
-        @views stepsize_adapter.stepsize_bar[chain] = stan_init_stepsize(
+        @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             stepsize[chain],
             metric[:, chain],
             rng[chain],
@@ -49,9 +49,9 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
 
     ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...)
     H = hamiltonian(ld, momentum, metric)
-    isnan(H) && (H = typemin(T))
+    isnan(H) && (H = typemax(T))
 
-    ΔH = H - H0
+    ΔH = H0 - H
     dh = convert(T, log(0.8))::T
     direction = ΔH > dh ? 1 : -1
 
@@ -64,9 +64,9 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
             q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...
         )
         H = hamiltonian(ld, momentum, metric)
-        isnan(H) && (H = typemin(T))
+        isnan(H) && (H = typemax(T))
 
-        ΔH = H - H0
+        ΔH = H0 - H
         if direction == 1 && !(ΔH > dh)
             break
         elseif direction == -1 && !(ΔH < dh)
