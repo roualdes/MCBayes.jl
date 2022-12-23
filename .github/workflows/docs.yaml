@@ -25,7 +25,7 @@ jobs:
 
       - name: Build doc
         run: |
-          julia --project=./docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("make.jl");'
+          julia --project=./docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("docs/make.jl");'
 
       - name: Commit doc
         run: |
