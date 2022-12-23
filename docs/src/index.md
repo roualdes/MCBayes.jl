@@ -11,4 +11,6 @@ Documentation for [MCBayes](https://github.com/roualdes/MCBayes.jl).
 
 ```@docs
 OnlineMoments
+update!
+PSPoint
 ```
