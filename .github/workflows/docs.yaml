@@ -23,15 +23,14 @@ jobs:
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
 
-      - name: Install package
+      - name: Build doc
         run: |
-          julia --project=./docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+          julia --project=./docs -e 'using Pkg;
+        Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("make.jl");'
 
-      - name: Build docs
+      - name: Commit doc
         run: |
-          cd docs/
-          make html
-          cd _build/html
+          cd docs/build
 
           git init
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -40,9 +39,9 @@ jobs:
           git commit -m "Rebuild docs"
           git branch -m gh-pages
 
-      - name: Push changes
+      - name: Push doc
         uses: ad-m/github-push-action@master
         with:
           branch: gh-pages
-          directory: docs/_build/html
+          directory: docs/build
           force: true
