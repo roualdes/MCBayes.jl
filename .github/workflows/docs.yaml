@@ -7,40 +7,30 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build-docs:
-    name: Publish documentation to gh-pages
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-      fail-fast: false
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out github
-        uses: actions/checkout@v3
-
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
-
-      - name: Build doc
-        run: |
-          julia --project=./docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("docs/make.jl");'
-
-      - name: Commit doc
-        run: |
-          cd docs/build
-
-          git init
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add .
-          git commit -m "Rebuild docs"
-          git branch -m gh-pages
-
-      - name: Push doc
-        uses: ad-m/github-push-action@master
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
         with:
-          branch: gh-pages
-          directory: docs/build
-          force: true
+          version: '1'
+      - run: |
+          git config --global user.name name
+          git config --global user.email email
+          git config --global github.user username
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      - run: |
+          julia --project=docs -e '
+            using Documenter: doctest
+            using MCBayes
+            doctest(MCBayes)'
+      - run: julia --project=docs docs/make.jl
+        env:
+          JULIA_PKG_SERVER: ""
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
