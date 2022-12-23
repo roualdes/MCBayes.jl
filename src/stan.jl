@@ -11,6 +11,11 @@ struct Stan{T} <: AbstractStan{T}
     maxdeltaH::T
 end
 
+"""
+    Stan(10, 4)
+
+Initialize Stan sampler object.  The number of dimensions `dims` and chains `chains` are the only required arguments.  The remaining keyword arguments attempt to replicate [Stan](https://mc-stan.org/) defaults.
+"""
 function Stan(
     dims,
     chains=1,
@@ -24,8 +29,13 @@ function Stan(
     return Stan(metric, stepsize, seed, dims, chains, maxtreedepth, maxdeltaH)
 end
 
+"""
+    sample!(sampler::Stan, ldg)
+
+Sample with Stan sampler object.  User must provide a function `ldg(position; kwargs...)` which accepts a `position::Vector` and returns a tuple containing the evaluation of the joint log density function and a vector of the gradient, each evaluated at the argument `position`.  The remaining keyword arguments attempt to replicate [Stan](https://mc-stan.org/) defaults.
+"""
 function sample!(
-    sampler::AbstractSampler{T},
+    sampler::Stan{T},
     ldg;
     iterations=1000,
     warmup=1000,
@@ -65,7 +75,7 @@ function sample!(
             kwargs...,
         )
     end
-    return draws, diagnostics
+    return draws, diagnostics, rngs
 end
 
 function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
@@ -96,7 +106,7 @@ function stan_kernel!(
     position, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...
 )
     T = eltype(position)
-    z = PSPoint(position, randn(rng, dims))
+    z = PSPoint(position, randn(rng, T, dims))
     ld, gradient = ldg(z.position; kwargs...)
     H0 = hamiltonian(ld, z.momentum)
 

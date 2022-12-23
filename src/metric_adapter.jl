@@ -1,15 +1,17 @@
-abstract type AbstractMetricAdapter end
+abstract type AbstractMetricAdapter{T} end
 
-struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter
-    om::OnlineMoments{T}
-    metric::Matrix{T}
-end
+Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
 function set_metric!(sampler, ma::AbstractMetricAdapter; kwargs...)
     return sampler.metric .= optimum(ma; kwargs...)
 end
 
-function MetricOnlineMoments(initial_metric::Matrix{T}; kwargs...) where {T}
+struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
+    om::OnlineMoments{T}
+    metric::Matrix{T}
+end
+
+function MetricOnlineMoments(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     return MetricOnlineMoments(om, initial_metric)
@@ -27,11 +29,11 @@ function reset!(mom::MetricOnlineMoments; kwargs...)
     return reset!(mom.om; kwargs...)
 end
 
-struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter
+struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
 end
 
-function MetricConstant(initial_metric::Matrix{T}; kwargs...) where {T}
+function MetricConstant(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
     return MetricConstant(initial_metric)
 end
 

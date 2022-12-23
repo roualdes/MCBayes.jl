@@ -21,17 +21,15 @@ include("trace.jl")
 include("convergence.jl")
 
 export Stan,
-    Adam,
     OnlineMoments,
+    MetricOnlineMoments,
+    MetricConstant,
     StepsizeAdam,
     StepsizeDualAverage,
     StepsizeConstant,
-    MetricOnlineMoments,
-    MetricConstant,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
     sample!,
-    optimum,
     ess,
     ess_bulk,
     ess_tail,
@@ -50,6 +48,6 @@ function ldg(x)
 end
 
 stan = Stan(10, 4)
-draws, diagnostics = sample!(stan, ldg)
+draws, diagnostics, rngs = sample!(stan, ldg)
 
 end

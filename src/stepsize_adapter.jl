@@ -1,15 +1,28 @@
-abstract type AbstractStepsizeAdapter end
+abstract type AbstractStepsizeAdapter{T} end
 
-struct StepsizeAdam{T<:AbstractFloat} <: AbstractStepsizeAdapter
+Base.eltype(::AbstractStepsizeAdapter{T}) where {T} = T
+
+function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
+    return ssa.stepsize_bar
+end
+
+# TODO(ear) move smoothed into optimum(; kwargs...)
+function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed=false, kwargs...)
+    sampler.stepsize .= smoothed ? optimum(ssa) : ssa.stepsize
+end
+
+struct StepsizeAdam{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     adam::Adam{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
 end
 
-function StepsizeAdam(initial_stepsize::Vector{T}; initializer=:sga, kwargs...) where {T}
+function StepsizeAdam(
+    initial_stepsize::AbstractVector{T}; initializer=:sga, kwargs...
+) where {T}
     chains = length(initial_stepsize)
-    adam = Adam(chains; kwargs...)
+    adam = Adam(chains, T; kwargs...)
     return StepsizeAdam(adam, initial_stepsize, zeros(T, chains), initializer)
 end
 
@@ -26,32 +39,28 @@ function update!(ssa::StepsizeAdam, αs; γ=-0.6, kwargs...)
     )
 end
 
-function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
-    return ssa.stepsize_bar
-end
-
-# TODO(ear) move smoothed into optimum(; kwargs...)
-function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed=false, kwargs...)
-    sampler.stepsize .= smoothed ? optimum(ssa) : ssa.stepsize
-end
-
 function reset!(ssa::StepsizeAdam; kwargs...)
     ss = ssa.stepsize_bar
     reset!(ssa.adam; initial_stepsize=ss, kwargs...)
 end
 
-struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter
+struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     da::DualAverage{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
 end
 
+"""
+    StepsizeDualAverage(initial_stepsize::Vector)
+
+Construct a stepsize adapter using the dual averaging method by [Nesterov 2009](https://link.springer.com/article/10.1007/s10107-007-0149-x), as used in [Stan](https://mc-stan.org/docs/reference-manual/hmc-algorithm-parameters.html#ref-Nesterov:2009).  The length of `initial_stepsize::Vector` must be appropriate for the sampling algorithm for which this stepsize adapter will be used.
+"""
 function StepsizeDualAverage(
-    initial_stepsize::Vector{T}; initializer=:stan, kwargs...
+    initial_stepsize::AbstractVector{T}; initializer=:stan, kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
-    da = DualAverage(chains; kwargs...)
+    da = DualAverage(chains, T; kwargs...)
     return StepsizeDualAverage(da, initial_stepsize, zeros(T, chains), initializer)
 end
 
@@ -66,14 +75,19 @@ function reset!(ssa::StepsizeDualAverage; kwargs...)
     reset!(ssa.da; initial_stepsize=ss, kwargs...)
 end
 
-struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter
+struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     initializer::Symbol
 end
 
+"""
+    StepsizeConstant(initial_stepsize::Vector)
+
+Construct a stepsize adapter for which the stepsize is fixed at it's initial value.
+"""
 function StepsizeConstant(
-    initial_stepsize::Vector{T}; initializer=:none, kwargs...
+    initial_stepsize::AbstractVector{T}; initializer=:none, kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
     return StepsizeConstant(initial_stepsize, initial_stepsize, initializer)

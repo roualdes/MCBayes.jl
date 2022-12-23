@@ -1,6 +1,8 @@
-abstract type AbstractTrajectorylengthAdapter end
+abstract type AbstractTrajectorylengthAdapter{T} end
 
-struct TrajectorylengthAdam{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter
+Base.eltype(::AbstractTrajectorylengthAdapter{T}) where {T} = T
+
+struct TrajectorylengthAdam{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     adam::Adam{T}
     initial_trajectorylength::Vector{T}
     trajectorylength::Vector{T}
@@ -9,10 +11,10 @@ struct TrajectorylengthAdam{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter
 end
 
 function TrajectorylengthAdam(
-    initial_stepsize::Vector{T}; initializer=:none, kwargs...
+    initial_stepsize::AbstractVector{T}; initializer=:none, kwargs...
 ) where {T}
     chains = length(initial_stepsize)
-    adam = Adam(chains; kwargs...)
+    adam = Adam(chains, T; kwargs...)
     return TrajectorylengthAdam(
         adam, initial_trajectorylength, zeros(T, chains), zeros(T, chains), initializer
     )
@@ -30,13 +32,13 @@ end
 
 # TODO update, reset
 
-struct TrajectorylengthConstant{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter
+struct TrajectorylengthConstant{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     trajectorylength_bar::Vector{T}
     initializer::Symbol
 end
 
 function TrajectorylengthConstant(
-    initial_trajectorylength::Vector{T}; initializer=:none, kwargs...
+    initial_trajectorylength::AbstractVector{T}; initializer=:none, kwargs...
 ) where {T<:AbstractFloat}
     return TrajectorylengthConstant(initial_trajectorylength, initializer)
 end

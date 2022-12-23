@@ -9,16 +9,15 @@ struct DualAverage{T<:AbstractFloat}
     counter::Vector{Int}
 end
 
-function DualAverage(chains; μ=log(10 * 1.0), δ=0.8, γ=0.05, t0=10.0, κ=0.75)
-    T = eltype(μ)
+function DualAverage(chains, T=Float64; μ=log(10), δ=0.8, γ=0.05, t0=10.0, κ=0.75)
     return DualAverage(
         zeros(T, chains),
         zeros(T, chains),
-        μ .* ones(T, chains),
-        γ .* ones(T, chains),
-        δ .* ones(T, chains),
-        κ .* ones(T, chains),
-        t0 .* ones(T, chains),
+        fill(convert(T, μ)::T, chains),
+        fill(convert(T, γ)::T, chains),
+        fill(convert(T, δ)::T, chains),
+        fill(convert(T, κ)::T, chains),
+        fill(convert(T, t0)::T, chains),
         zeros(Int, chains),
     )
 end
