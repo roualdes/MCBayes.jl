@@ -438,6 +438,6 @@ function adapt!(
             calculate_nextwindow!(schedule)
         end
     else
-        set_stepsize!(sampler, stepsize_adapter; smoothed = true, kwargs...)
+        set_stepsize!(sampler, stepsize_adapter; smoothed=true, kwargs...)
     end
 end

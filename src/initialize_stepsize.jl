@@ -13,9 +13,7 @@ end
 function init_stepsize!(
     method::Symbol, stepsize_adapter, metric, rng, ldg, positions; kwargs...
 )
-    init_stepsize!(
-        Val{method}(), stepsize_adapter, metric, rng, ldg, positions; kwargs...
-    )
+    init_stepsize!(Val{method}(), stepsize_adapter, metric, rng, ldg, positions; kwargs...)
 end
 
 function init_stepsize!(

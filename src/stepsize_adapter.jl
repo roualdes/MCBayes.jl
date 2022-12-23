@@ -10,9 +10,7 @@ end
 function StepsizeAdam(initial_stepsize::Vector{T}; initializer=:sga, kwargs...) where {T}
     chains = length(initial_stepsize)
     adam = Adam(chains; kwargs...)
-    return StepsizeAdam(
-        adam, initial_stepsize, zeros(T, chains), initializer
-    )
+    return StepsizeAdam(adam, initial_stepsize, zeros(T, chains), initializer)
 end
 
 """
@@ -33,7 +31,7 @@ function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed = false, kwargs...)
+function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed=false, kwargs...)
     sampler.stepsize .= smoothed ? optimum(ssa) : ssa.stepsize
 end
 
@@ -54,9 +52,7 @@ function StepsizeDualAverage(
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
     da = DualAverage(chains; kwargs...)
-    return StepsizeDualAverage(
-        da, initial_stepsize, zeros(T, chains), initializer
-    )
+    return StepsizeDualAverage(da, initial_stepsize, zeros(T, chains), initializer)
 end
 
 function update!(ssa::StepsizeDualAverage, αs; kwargs...)
