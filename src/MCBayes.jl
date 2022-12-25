@@ -4,6 +4,10 @@ using Random
 using LinearAlgebra
 using Statistics
 
+abstract type AbstractSampler{T<:AbstractFloat} end
+
+Base.eltype(::AbstractSampler{T}) where {T} = T
+
 include("windowedadaptation.jl")
 include("dualaverage.jl")
 include("adam.jl")

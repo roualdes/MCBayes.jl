@@ -29,6 +29,3 @@ Manifest.toml
 build/
 
 .DS_Store
-
-notes.org
-play.jl

@@ -1,0 +1,21 @@
+#!/bin/zsh
+
+cmd="$1"
+
+if [ "$cmd" = "test" ]; then
+
+    julia -e 'using Pkg; Pkg.activate("."); Pkg.test();'
+
+elif [ "$cmd" = "pretty" ]; then
+
+    julia -e 'using JuliaFormatter; format(".", verbose = true);'
+
+elif [ "$cmd" = "doc" ]; then
+
+    julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("docs/make.jl");'
+
+else
+
+    echo "unknown command: ${cmd}"
+
+fi

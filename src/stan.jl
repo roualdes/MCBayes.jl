@@ -1,4 +1,3 @@
-abstract type AbstractSampler{T<:AbstractFloat} end
 abstract type AbstractStan{T} <: AbstractSampler{T} end
 
 struct Stan{T} <: AbstractStan{T}
@@ -12,9 +11,12 @@ struct Stan{T} <: AbstractStan{T}
 end
 
 """
-    Stan(10, 4)
+    Stan(dims, chains, T = Float64; kwargs...)
 
-Initialize Stan sampler object.  The number of dimensions `dims` and chains `chains` are the only required arguments.  The remaining keyword arguments attempt to replicate [Stan](https://mc-stan.org/) defaults.
+Initialize Stan sampler object.  The number of dimensions `dims` and number of
+chains `chains` are the only required arguments.  The type `T` of the ...
+
+Optionally, via keyword arguments, can set the metric, stepsize, seed, maxtreedepth, and maxdeltaH.
 """
 function Stan(
     dims,
@@ -32,7 +34,11 @@ end
 """
     sample!(sampler::Stan, ldg)
 
-Sample with Stan sampler object.  User must provide a function `ldg(position; kwargs...)` which accepts a `position::Vector` and returns a tuple containing the evaluation of the joint log density function and a vector of the gradient, each evaluated at the argument `position`.  The remaining keyword arguments attempt to replicate [Stan](https://mc-stan.org/) defaults.
+Sample with Stan sampler object.  User must provide a function `ldg(position;
+kwargs...)` which accepts `position::Vector` and returns a tuple containing
+the evaluation of the joint log density function and a vector of the gradient,
+each evaluated at the argument `position`.  The remaining keyword arguments
+attempt to replicate [Stan](https://mc-stan.org/) defaults.
 """
 function sample!(
     sampler::Stan{T},
@@ -80,20 +86,18 @@ end
 
 function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
     for chain in axes(draws, 3) # TODO multi-thread-able
-        @views metric = sampler.metric[:, chain]
-        stepsize = sampler.stepsize[chain]
         @views info = stan_kernel!(
             draws[m, :, chain],
+            draws[m + 1, :, chain],
             rngs[chain],
             sampler.dims,
-            metric,
-            stepsize,
+            sampler.metric[:, chain],
+            sampler.stepsize[chain],
             sampler.maxdeltaH,
             sampler.maxtreedepth,
             ldg;
             kwargs...,
         )
-        draws[m + 1, :, chain] .= info.position_next
         record!(trace, info, m, chain)
     end
 end
@@ -103,7 +107,7 @@ function stancriterion(pbeg, pend, rho)
 end
 
 function stan_kernel!(
-    position, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...
+    position, position_next, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...
 )
     T = eltype(position)
     z = PSPoint(position, randn(rng, T, dims))
@@ -237,11 +241,10 @@ function stan_kernel!(
         !persist && break
     end # end while
 
-    position_next = zsample.position
-    ld, gradient = ldg(position_next; kwargs...)
+    position_next .= zsample.position
+    ld, gradient = ldg(zsample.position; kwargs...)
 
     return (;
-        position_next,
         accepted,
         divergence,
         stepsize,
