@@ -20,7 +20,7 @@ Optionally, via keyword arguments, can set the metric, stepsize, seed, maxtreede
 """
 function Stan(
     dims,
-    chains=1,
+    chains=4,
     T=Float64;
     metric=ones(T, dims, chains),
     stepsize=ones(T, chains),
@@ -241,8 +241,8 @@ function stan_kernel!(
         !persist && break
     end # end while
 
-    position_next .= zsample.position
     ld, gradient = ldg(zsample.position; kwargs...)
+    position_next .= zsample.position
 
     return (;
         accepted,

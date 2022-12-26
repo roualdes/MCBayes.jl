@@ -4,7 +4,7 @@ end
 
 function initialize_draws!(::Val{:stan}, draws, rng, ldg; kwargs...)
     for chain in axes(draws, 3)
-        draws[1, :, chain] = stan_initialize_draw(
+        @views draws[1, :, chain] = stan_initialize_draw(
             draws[1, :, chain], ldg, rng[chain]; kwargs...
         )
     end
@@ -15,10 +15,11 @@ function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs
     a = 0
     T = eltype(position)
     dims = length(position)
+    q = copy(position)
 
     while a < attempts && !initialized
-        position .= radius .* (2 .* rand(rng, T, dims) .- 1)
-        ld, gradient = ldg(position; kwargs...)
+        q .= radius .* (2 .* rand(rng, T, dims) .- 1)
+        ld, gradient = ldg(q; kwargs...)
 
         if isfinite(ld) && !isnan(ld)
             initialized = true
@@ -35,7 +36,7 @@ function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs
     if a > attempts
         throw("Failed to find inital values in $(attempts) attempts.")
     end
-    return position
+    return q
 end
 
 # TODO needs a second look

@@ -40,13 +40,13 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     T = eltype(position)
     dims = length(position)
     q = copy(position)
-    momentum = rand_momentum(rng, dims, metric)
+    momentum = randn(rng, T, dims)
 
     ld, gradient = ldg(q; kwargs...)
-    H0 = hamiltonian(ld, momentum, metric)
+    H0 = hamiltonian(ld, momentum)
 
     ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...)
-    H = hamiltonian(ld, momentum, metric)
+    H = hamiltonian(ld, momentum)
     isnan(H) && (H = typemax(T))
 
     ΔH = H0 - H
@@ -54,14 +54,15 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     direction = ΔH > dh ? 1 : -1
 
     while true
-        momentum .= rand_momentum(rng, dims, metric)
-        H0 = hamiltonian(ld, momentum, metric)
+        println("stepsize = $(stepsize)")
+        momentum .= randn(rng, T, dims)
+        H0 = hamiltonian(ld, momentum)
         q .= position
 
         ld, gradient = leapfrog!(
             q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...
         )
-        H = hamiltonian(ld, momentum, metric)
+        H = hamiltonian(ld, momentum)
         isnan(H) && (H = typemax(T))
 
         ΔH = H0 - H
@@ -82,6 +83,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
             )
         end
     end
+    println("done initializing stepsize")
     return stepsize
 end
 
