@@ -55,7 +55,7 @@ function sample!(
 ) where {T<:AbstractFloat}
     M = iterations + warmup
     draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
-    diagnostics = trace(sampler, M)
+    diagnostics = trace(sampler, M + 1)
 
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 
@@ -98,7 +98,7 @@ function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
             ldg;
             kwargs...,
         )
-        record!(trace, info, m, chain)
+        record!(trace, info, m + 1, chain)
     end
 end
 
@@ -121,7 +121,7 @@ function stan_kernel!(
 
     # Momentum and sharp momentum at forward end of forward subtree
     pff = copy(z.momentum)
-    psharpff = z.momentum .* metric
+    psharpff = z.momentum
 
     # Momentum and sharp momentum at backward end of forward subtree
     pfb = copy(pff)
@@ -248,7 +248,7 @@ function stan_kernel!(
         accepted,
         divergence,
         stepsize,
-        energy=hamiltonian(ld, z.momentum),
+        energy=hamiltonian(ld, zsample.momentum),
         acceptstat=α / nleapfrog,
         treedepth=depth,
         leapfrog=nleapfrog,
@@ -300,7 +300,7 @@ function buildtree!(
         logsumweight = logsumexp(logsumweight, Δ)
         α += Δ > zero(Δ) ? one(Δ) : exp(Δ)
 
-        @. psharpbeg = z.momentum * metric
+        psharpbeg .= z.momentum
         psharpend .= psharpbeg
 
         rho .+= z.momentum
@@ -372,7 +372,7 @@ function buildtree!(
     )
 
     if !validfinal
-        return validfinal, nleapfrog, logsumweight, α
+        return validfinal, nleapfrog, lswinit, α
     end
 
     lswsubtree = logsumexp(lswinit, lswfinal)
@@ -418,7 +418,7 @@ function adapt!(
 )
     warmup = schedule.warmup
     if m <= warmup
-        @views accept_stats = trace.acceptstat[m, :]
+        accept_stats = trace.acceptstat[m, :]
         update!(stepsize_adapter, accept_stats; warmup, kwargs...)
         set_stepsize!(sampler, stepsize_adapter; kwargs...)
 

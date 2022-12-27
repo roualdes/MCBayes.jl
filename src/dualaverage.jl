@@ -9,6 +9,8 @@ struct DualAverage{T<:AbstractFloat}
     counter::Vector{Int}
 end
 
+# TODO want ensure_vector or some such function
+# TODO enable μ to be set as log(10 * initial_stepsize)
 function DualAverage(chains, T=Float64; μ=log(10), δ=0.8, γ=0.05, t0=10.0, κ=0.75)
     return DualAverage(
         zeros(T, chains),
