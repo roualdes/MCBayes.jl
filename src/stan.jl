@@ -284,7 +284,7 @@ function buildtree!(
             z.momentum,
             ldg,
             gradient,
-            direction .* stepsize .* metric,
+            direction .* stepsize .* sqrt.(metric),
             1;
             kwargs...,
         )

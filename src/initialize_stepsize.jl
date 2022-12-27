@@ -45,7 +45,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     ld, gradient = ldg(q; kwargs...)
     H0 = hamiltonian(ld, momentum)
 
-    ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...)
+    ld, gradient = leapfrog!(q, momentum, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...)
     H = hamiltonian(ld, momentum)
     isnan(H) && (H = typemax(T))
 
@@ -60,7 +60,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
         H0 = hamiltonian(ld, momentum)
 
         ld, gradient = leapfrog!(
-            q, momentum, ldg, gradient, stepsize .* metric, 1; kwargs...
+            q, momentum, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...
         )
         H = hamiltonian(ld, momentum)
         isnan(H) && (H = typemax(T))

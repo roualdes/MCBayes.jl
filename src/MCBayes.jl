@@ -34,15 +34,13 @@ export Stan,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
     sample!,
-    ess,
-    ess_bulk,
+    # ess_bulk, # wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
     ess_quantile,
     ess_mean,
     ess_sq,
     ess_std,
-    ess_f,
-    rhat,
+    # rhat,  # wait until https://github.com/JuliaLang/julia/pull/47040
     rhat_basic,
     mcse_mean,
     mcse_std

@@ -131,15 +131,7 @@ function _ess(x)
     return ess / τ
 end
 
-function ess(x::AbstractArray{T,3}) where {T<:AbstractFloat}
-    return mapslices(_ess, x; dims=(1, 3))
-end
-
-function ess(x::AbstractVecOrMat)
-    return mapslices(_ess, x; dims=1)
-end
-
-function _rhat_basic(x)
+function _rhat(x)
     any(isnan.(x)) && return NaN
     any(isinf.(x)) && return NaN
     isconstant(x) && return NaN
@@ -155,8 +147,16 @@ function _rhat_basic(x)
     return sqrt((var_between / var_within + niterations - 1) / niterations)
 end
 
+function _rhat_basic(x)
+    return _rhat(splitchains(x))
+end
+
 function rhat_basic(x::AbstractArray{T,3}) where {T<:AbstractFloat}
     return mapslices(_rhat_basic, x; dims=(1, 3))
+end
+
+function rhat_basic(x::AbstractVecOrMat)
+    return mapslices(_rhat_basic, x; dims = 1)
 end
 
 function isconstant(x, tol=sqrt(eps(Float64)))
@@ -245,45 +245,45 @@ function tiedrank(x)
     return rks
 end
 
-function quantile_normal(p, l, s)
-    q = SpecialFunctions.erfinv(2 * p - 1)
-    return l + s * sqrt(2) * q
-end
+# function quantile_normal(p, l, s)
+#     q = SpecialFunctions.erfinv(2 * p - 1)
+#     return l + s * sqrt(2) * q
+# end
 
-function zscale(x)
-    r = tiedrank(vec(x))
-    z = quantile_normal.((r .- 0.375) ./ (length(x) + 0.25), 0, 1) # Blom (1958) (6.10.3)
-    if length(size(x)) > 1
-        z = reshape(z, size(x))
-    end
-    return z
-end
+# function zscale(x)
+#     r = tiedrank(vec(x))
+#     z = quantile_normal.((r .- 0.375) ./ (length(x) + 0.25), 0, 1) # Blom (1958) (6.10.3)
+#     if length(size(x)) > 1
+#         z = reshape(z, size(x))
+#     end
+#     return z
+# end
 
-function rhat(x::AbstractArray{T,3}) where {T<:AbstractFloat}
-    return mapslices(max_rhat, x; dims=(1, 3))
-end
+# function rhat(x::AbstractArray{T,3}) where {T<:AbstractFloat}
+#     return mapslices(max_rhat, x; dims=(1, 3))
+# end
 
-function rhat(x::AbstractVecOrMat)
-    return mapslices(max_rhat, x; dims=1)
-end
+# function rhat(x::AbstractVecOrMat)
+#     return mapslices(max_rhat, x; dims=1)
+# end
 
-function max_rhat(x)
-    rhat_bulk = rhat_basic(zscale(splitchains(x)))
-    rhat_tail = rhat_basic(zscale(splitchains(fold(x))))
-    return max(rhat_bulk, rhat_tail)
-end
+# function max_rhat(x)
+#     rhat_bulk = rhat_basic(zscale(splitchains(x)))
+#     rhat_tail = rhat_basic(zscale(splitchains(fold(x))))
+#     return max(rhat_bulk, rhat_tail)
+# end
 
-function _ess_bulk(x)
-    return _ess(zscale(splitchains(x)))
-end
+# function _ess_bulk(x)
+#     return _ess(zscale(splitchains(x)))
+# end
 
-function ess_bulk(x::AbstractArray{T,3}) where {T<:AbstractFloat}
-    return mapslices(_ess_bulk, x; dims=(1, 3))
-end
+# function ess_bulk(x::AbstractArray{T,3}) where {T<:AbstractFloat}
+#     return mapslices(_ess_bulk, x; dims=(1, 3))
+# end
 
-function ess_bulk(x::AbstractVecOrMat)
-    return mapslices(_ess_bulk, x; dims=1)
-end
+# function ess_bulk(x::AbstractVecOrMat)
+#     return mapslices(_ess_bulk, x; dims=1)
+# end
 
 function _ess_tail(x)
     I05 = x .<= quantile(x[:], 0.05)
@@ -352,7 +352,7 @@ function ess_f(x::AbstractVecOrMat)
 end
 
 function _ess_std(x)
-    return min(_ess_mean(x), _ess_sq(x))
+    return _ess(splitchains(abs.(x .- mean(x))))
 end
 
 function ess_std(x::AbstractArray{T,3}) where {T<:AbstractFloat}
@@ -387,14 +387,13 @@ function mcse_mean(x::AbstractVecOrMat)
     return std(x; dims=1) ./ sqrt.(ess_mean(x))
 end
 
-function mcse_std(x::AbstractArray{T,3}) where {T<:AbstractFloat}
-    ess_sd = ess_std(x)
-    return std(x; dims=(1, 3)) .* sqrt.(exp.(1) .* (1 .- 1 ./ ess_sd) .^ (ess_sd .- 1) .- 1)
-end
-
-function mcse_std(x::AbstractVecOrMat)
-    ess_sd = ess_std(x)
-    return std(x; dims=1) .* sqrt.(exp.(1) .* (1 .- 1 ./ ess_sd) .^ (ess_sd .- 1) .- 1)
+function mcse_std(x)
+    sims_c = x .- mean(x)
+    ess = ess_mean(abs.(sims_c))
+    Evar = mean(sims_c .^ 2)
+    varvar = (mean(sims_c .^ 4) .- Evar .^ 2) ./ ess
+    varsd = varvar ./ Evar ./ 4
+    return sqrt.(varsd)
 end
 
 function mad(x)
