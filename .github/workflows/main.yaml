@@ -15,10 +15,13 @@ jobs:
         repository: roualdes/bridgestan
         with:
           submodules: recursive
-      - name: Install dependencies
+
+      - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.8'
+
+      - name: Install dependencies
         run: julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path=joinpath(homedir(), "bridgestan"),subdir="julia")); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test();'
