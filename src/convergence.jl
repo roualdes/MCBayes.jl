@@ -156,7 +156,7 @@ function rhat_basic(x::AbstractArray{T,3}) where {T<:AbstractFloat}
 end
 
 function rhat_basic(x::AbstractVecOrMat)
-    return mapslices(_rhat_basic, x; dims = 1)
+    return mapslices(_rhat_basic, x; dims=1)
 end
 
 function isconstant(x, tol=sqrt(eps(Float64)))

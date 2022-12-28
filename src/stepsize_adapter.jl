@@ -40,7 +40,7 @@ function update!(ssa::StepsizeAdam, αs; γ=-0.6, kwargs...)
 end
 
 function reset!(ssa::StepsizeAdam; kwargs...)
-    reset!(ssa.adam; initial_stepsize = ssa.stepsize, kwargs...)
+    reset!(ssa.adam; initial_stepsize=ssa.stepsize, kwargs...)
 end
 
 struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
@@ -70,7 +70,7 @@ function update!(ssa::StepsizeDualAverage, αs; kwargs...)
 end
 
 function reset!(ssa::StepsizeDualAverage; kwargs...)
-    reset!(ssa.da; initial_stepsize = ssa.stepsize_bar, kwargs...)
+    reset!(ssa.da; initial_stepsize=ssa.stepsize_bar, kwargs...)
 end
 
 struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}

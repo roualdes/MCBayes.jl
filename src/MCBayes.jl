@@ -51,5 +51,7 @@ end
 
 stan = Stan(10, 4)
 draws, diagnostics, rngs = sample!(stan, ldg)
+ess_mean(draws)
+rhat_basic(draws)
 
 end

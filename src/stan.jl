@@ -28,7 +28,8 @@ function Stan(
     maxtreedepth=10,
     maxdeltaH=convert(T, 1000),
 )
-    return Stan(metric, stepsize, seed, dims, chains, maxtreedepth, maxdeltaH)
+    D = convert(Int, dims)::Int
+    return Stan(metric, stepsize, seed, D, chains, maxtreedepth, maxdeltaH)
 end
 
 """
@@ -107,7 +108,16 @@ function stancriterion(pbeg, pend, rho)
 end
 
 function stan_kernel!(
-    position, position_next, rng, dims, metric, stepsize, maxdeltaH, maxtreedepth, ldg; kwargs...
+    position,
+    position_next,
+    rng,
+    dims,
+    metric,
+    stepsize,
+    maxdeltaH,
+    maxtreedepth,
+    ldg;
+    kwargs...,
 )
     T = eltype(position)
     z = PSPoint(position, randn(rng, T, dims))
