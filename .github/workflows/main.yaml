@@ -12,8 +12,8 @@ jobs:
     steps:
       - name: Check out github
         uses: actions/checkout@v3
-        repository: roualdes/bridgestan
         with:
+          repository: roualdes/bridgestan
           submodules: recursive
 
       - name: Set up Julia
