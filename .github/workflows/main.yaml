@@ -10,11 +10,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - uses: julia-actions/setup-julia@v1
         with:
           version: '1.8'
+      - name: Check out github
+        repository: roualdes/bridgestan
       - name: Install dependencies
-        run: julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(url="https://github.com/roualdes/bridgestan", subdir="julia")); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+        run: julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path=joinpath(homedir(), "bridgestan"), subdir="julia")); Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test();'

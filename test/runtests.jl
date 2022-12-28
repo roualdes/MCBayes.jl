@@ -5,7 +5,7 @@ using Statistics
 using BridgeStan
 
 const BS = BridgeStan
-bsdir = joinpath(homedir(), "./julia/dev/bridgestan")
+bsdir = joinpath(homedir(), "bridgestan")
 BS.set_bridgestan_path!(bsdir)
 
 include("test_onlinemoments.jl")
