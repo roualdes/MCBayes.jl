@@ -23,6 +23,6 @@ jobs:
           version: '1.8'
 
       - name: Install dependencies
-        run: julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path=joinpath(homedir(), """bridgestan"), subdir="julia")); Pkg.instantiate()'
+        run: julia --project=test/ -e 'using Pkg; Pkg.develop(PackageSpec(path="bridgestan"), subdir="julia")); Pkg.instantiate()'
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test();'
