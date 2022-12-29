@@ -1,4 +1,5 @@
 @testset "Stan sampling" begin
+    # models and values from stan-dev/posteriordb
     expectations = Dict(
         "illconditioned_mvnormal" =>
             Dict(:true_mean => zeros(10), :true_std => sqrt.(10.0 .^ [-2:7;])),
@@ -50,25 +51,12 @@
         ),
     )
 
-    # test_models = "/Users/ez/dos/research/mcbayes/bridgestan/test_models"
-    # open(mktempdir(), "w") do dir
-    #     for model_name in keys(expectation)
-
-    #         modeldir = joinpath(artifact"test_models", model_name)
-    #         stan_file = joinpath(modeldir, model_name * ".stan")
-    #         data_file = joinpath(modeldir, model_name * ".json")
-
-    # end
-    # model_names = [f for f in readdir(test_models) if isdir(joinpath(test_models, f))]
     modeldir = joinpath(artifact"test_models", "test_models")
     model_names = [f for f in readdir(modeldir) if isdir(joinpath(modeldir, f))]
     warmup = 2000
     iterations = 5000
 
     function prepare_model(model_name)
-        # modeldir = joinpath(test_models, model_name)
-        # stan_file = joinpath(modeldir, model_name * ".stan")
-        # stan_data = joinpath(modeldir, model_name * ".json")
         modeldir = joinpath(artifact"test_models", "test_models", model_name)
         stan_file = joinpath(modeldir, model_name * ".stan")
         stan_data = joinpath(modeldir, model_name * ".json")
