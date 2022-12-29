@@ -10,6 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out github
+        uses: actions/checkout@v3
+
       - name: Check out BridgeStan
         uses: actions/checkout@v3
         with:
@@ -23,4 +26,4 @@ jobs:
           version: '1.8'
 
       - name: Install dependencies
-        run: julia --project=. -e 'using Pkg; Pkg.add(PackageSpec(path="bridgestan", subdir="julia")); Pkg.test()'
+        run: julia --project=./MCBayes.jl -e 'using Pkg; Pkg.add(PackageSpec(path="bridgestan", subdir="julia")); Pkg.test()'
