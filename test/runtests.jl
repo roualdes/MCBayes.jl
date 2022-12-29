@@ -5,7 +5,11 @@ using Statistics
 using BridgeStan
 
 const BS = BridgeStan
-bsdir = joinpath(homedir(), "bridgestan")
+bsdir = if get(ENV, "CI", "false") == "true"
+    "bridgestan"
+else
+    joinpath(homedir(), "bridgestan")
+end
 BS.set_bridgestan_path!(bsdir)
 
 include("test_onlinemoments.jl")
