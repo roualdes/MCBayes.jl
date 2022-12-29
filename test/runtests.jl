@@ -6,7 +6,7 @@ using BridgeStan
 
 const BS = BridgeStan
 cwd = if get(ENV, "CI", "false") == "true"
-    pwd()
+    dirname(pwd())
 else
     homedir()
 end
