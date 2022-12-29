@@ -18,7 +18,7 @@ jobs:
         with:
           repository: roualdes/bridgestan
           submodules: recursive
-          path: bridgestan
+          path: ../bridgestan
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
@@ -26,4 +26,4 @@ jobs:
           version: '1.8'
 
       - name: Install dependencies
-        run: julia --project=./MCBayes.jl -e 'using Pkg; Pkg.add(PackageSpec(path="bridgestan", subdir="julia")); Pkg.test()'
+        run: julia --project=. -e 'using Pkg; Pkg.add(PackageSpec(path="bridgestan", subdir="julia")); Pkg.test()'
