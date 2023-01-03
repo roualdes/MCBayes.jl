@@ -1,4 +1,4 @@
-@testset "Stan sampling" begin
+@testset "Stan sampling" verbose=true begin
     # models and values from stan-dev/posteriordb
     expectations = Dict(
         "illconditioned_mvnormal" =>
