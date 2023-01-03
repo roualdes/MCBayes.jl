@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+  pull_request:
   workflow_dispatch: {}
 
 jobs:
@@ -18,12 +19,16 @@ jobs:
         with:
           repository: roualdes/bridgestan
           submodules: recursive
+          ref: "v1.0.0"
           path: bridgestan
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.8'
+
+      - name: Cache julia artifacts (test_models)
+        uses: julia-actions/cache@v1
 
       - name: Install BridgeStan
         run: julia --project=./test -e 'using Pkg; Pkg.develop(PackageSpec(path="bridgestan", subdir="julia")); Pkg.instantiate();'
