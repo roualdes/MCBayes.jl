@@ -18,6 +18,7 @@ include("metric_adapter.jl")
 include("initialize_draws.jl")
 include("initialize_stepsize.jl")
 include("stan.jl")
+include("mh.jl")
 include("tools.jl")
 include("integrator.jl")
 include("pspoint.jl")
@@ -25,6 +26,7 @@ include("trace.jl")
 include("convergence.jl")
 
 export Stan,
+    MH,
     OnlineMoments,
     MetricOnlineMoments,
     MetricConstant,

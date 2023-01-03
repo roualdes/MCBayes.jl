@@ -1,11 +1,21 @@
-function initialize_draws!(method::Symbol, draws, rng, ldg; kwargs...)
-    return initialize_draws!(Val{method}(), draws, rng, ldg; kwargs...)
+# TODO incorporate metric, in the rare case that a user knows a good metric and wants
+# to initialize_draws with that information
+function initialize_draws!(method::Symbol, draws, rngs, ldg; kwargs...)
+    return initialize_draws!(Val{method}(), draws, rngs, ldg; kwargs...)
 end
 
-function initialize_draws!(::Val{:stan}, draws, rng, ldg; kwargs...)
+function initialize_draws!(::Val{:mh}, draws, rngs, ld; radius=2, kwargs...)
+    T = eltype(draws)
+    dims = size(draws, 2)
+    for chain in axes(draws, 3)
+        @views draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
+    end
+end
+
+function initialize_draws!(::Val{:stan}, draws, rngs, ldg; kwargs...)
     for chain in axes(draws, 3)
         @views draws[1, :, chain] = stan_initialize_draw(
-            draws[1, :, chain], ldg, rng[chain]; kwargs...
+            draws[1, :, chain], ldg, rngs[chain]; kwargs...
         )
     end
 end

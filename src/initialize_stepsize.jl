@@ -1,9 +1,9 @@
-function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, positions; kwargs...)
+function initialize_stepsize!(stepsize_adapter, metric, rngs, ldg, positions; kwargs...)
     init_stepsize!(
         stepsize_adapter.initializer,
         stepsize_adapter,
         metric,
-        rng,
+        rngs,
         ldg,
         positions;
         kwargs...,
@@ -11,24 +11,31 @@ function initialize_stepsize!(stepsize_adapter, metric, rng, ldg, positions; kwa
 end
 
 function init_stepsize!(
-    method::Symbol, stepsize_adapter, metric, rng, ldg, positions; kwargs...
+    method::Symbol, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
 )
-    init_stepsize!(Val{method}(), stepsize_adapter, metric, rng, ldg, positions; kwargs...)
+    init_stepsize!(Val{method}(), stepsize_adapter, metric, rngs, ldg, positions; kwargs...)
 end
 
 function init_stepsize!(
-    ::Val{:none}, stepsize_adapter, metric, rng, ldg, positions; kwargs...
+    ::Val{:mh}, stepsize_adapter, metric, rngs, ld, positions; kwargs...
+)
+    dims = size(positions, 1)
+    stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
+end
+
+function init_stepsize!(
+    ::Val{:none}, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
 ) end
 
 function init_stepsize!(
-    ::Val{:stan}, stepsize_adapter, metric, rng, ldg, positions; kwargs...
+    ::Val{:stan}, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
 )
     stepsize = stepsize_adapter.stepsize
     for chain in axes(positions, 2)
         @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             stepsize[chain],
             metric[:, chain],
-            rng[chain],
+            rngs[chain],
             ldg,
             positions[:, chain];
             kwargs...,
