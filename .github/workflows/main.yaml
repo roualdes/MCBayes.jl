@@ -27,8 +27,19 @@ jobs:
         with:
           version: '1.8'
 
+      - name: Stan build caching
+        uses: actions/cache@v3
+        id: stan-cache
+        with:
+          path: ./bridgestan/stan/
+          key: stan-${{ runner.os }}
+
       - name: Cache julia artifacts (test_models)
-        uses: julia-actions/cache@v1
+        uses: actions/cache@v3
+        id: julia-artifacts-cache
+        with:
+          path: ~/.julia/artifacts
+          key: julia-${{ runner.os }}-${{ hashFiles('**/Project.toml', '**/Artifacts.toml') }}
 
       - name: Install BridgeStan
         run: julia --project=./test -e 'using Pkg; Pkg.develop(PackageSpec(path="bridgestan", subdir="julia")); Pkg.instantiate();'
