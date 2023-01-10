@@ -1,0 +1,32 @@
+name: mcbayes tests
+
+on:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out github
+        uses: actions/checkout@v3
+
+      - name: Check out BridgeStan
+        uses: actions/checkout@v3
+        with:
+          repository: roualdes/bridgestan
+          submodules: recursive
+          path: bridgestan
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.8'
+
+      - name: Install BridgeStan
+        run: julia --project=./test -e 'using Pkg; Pkg.develop(PackageSpec(path="bridgestan", subdir="julia")); Pkg.instantiate();'
+
+      - name: Run tests
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'

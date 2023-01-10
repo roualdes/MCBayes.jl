@@ -1,16 +1,11 @@
-# TODO adapt to matrix metric
-struct OnlineMoments{T <: AbstractFloat}
+struct OnlineMoments{T<:AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
     v::Matrix{T}
-    update::Bool
 end
 
-function OnlineMoments(T, d, c; update = true)
-    return OnlineMoments(zeros(Int, c),
-                         zeros(T, d, c),
-                         zeros(T, d, c),
-                         update)
+function OnlineMoments(T, d, c)
+    return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
 end
 
 """
@@ -21,7 +16,7 @@ size (d, c). When `update!(om::OnlineMoments, x::Matrix)` is called, update
 determines whether or not any updates will actually be applied.
 
 """
-OnlineMoments(d, c = 1; update = true) = OnlineMoments(Float64, d, c; update = update)
+OnlineMoments(d, c=1) = OnlineMoments(Float64, d, c)
 
 """
     update!(om::OnlineMoments, x::Matrix; kwargs...)
@@ -33,43 +28,48 @@ latter case, all columns of x will be used to update the same moments
 om.m and om.v.
 
 """
-function update!(om::OnlineMoments, x::Matrix; kwargs...)
-    if om.update
-        dims, chains = size(x)
-        d, metrics = size(om.m)
+function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
+    dims, chains = size(x)
+    d, metrics = size(om.m)
 
-        if dims != d
-            throw(DimensionMismatch("size(x, 1) should equal size(om.m, 1) == $d"))
-        end
+    if dims != d
+        throw(DimensionMismatch("size(x, 1) should equal size(om.m, 1) == $d"))
+    end
 
-        if chains != metrics && metrics != 1
-            throw(DimensionMismatch("size(x, 2) should equal size(om.m, 2) == $metrics or equal 1"))
-        end
+    if chains != metrics && metrics != 1
+        throw(
+            DimensionMismatch(
+                "size(x, 2) should equal size(om.m, 2) == $metrics or equal 1"
+            ),
+        )
+    end
 
-        for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
-            om.n[metric] += 1
-            m = x[:, chain] .- om.m[:, metric]
-            v = -om.v[:, metric]
-            w = 1 / om.n[metric]
-            @. om.m[:, metric] += m * w
-            @. om.v[:, metric] += v * w + m ^ 2 * w * (1 - w)
-        end
+    @views for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
+        om.n[metric] += 1
+        m = x[:, chain] .- om.m[:, metric]
+        w = 1 / om.n[metric]
+        @. om.m[:, metric] += m * w
+        @. om.v[:, metric] += -om.v[:, metric] * w + m^2 * w * (1 - w)
     end
 end
 
-function reset!(om::OnlineMoments)
+function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
     om.v .= 0
 end
 
-function metric(om::OnlineMoments; regularized = true)
+function optimum(om::OnlineMoments; regularized=true, kwargs...)
     T = eltype(om.v)
-    v = if regularized
-        w = convert.(T, om.n ./ (om.n .+ 5))
-        @. w' * om.v + (1 - w') * convert(T, 1e-3)
+    if om.n[1] > 1
+        v = if regularized
+            w = reshape(convert.(T, om.n ./ (om.n .+ 5)), 1, :)
+            @. w * om.v + (1 - w) * convert(T, 1e-3)
+        else
+            om.v
+        end
+        return v
     else
-        om.v
+        return ones(T, size(om.v))
     end
-    return v
 end

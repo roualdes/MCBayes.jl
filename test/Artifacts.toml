@@ -1,0 +1,6 @@
+[test_models]
+git-tree-sha1 = "57fa0fa12d2557ae62b231e90a914de0115b8eab"
+
+    [[test_models.download]]
+    url = "https://gist.github.com/roualdes/0d3660c5cca8e38a6dc94224a18b066f/raw/a086002b021f675686fe65d14dcb37916c947d58/test_models.tar.gz"
+    sha256 = "a6ebfd0846ae3239fbebff821c98f713bafa81f81382e07b15f26147d3e3ed09"

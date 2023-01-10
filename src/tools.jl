@@ -1,13 +1,24 @@
-function hmc!(integrator, next_position, position, momenta, ldg, gradient, stepsize, steps, maxdeltaH;
-              kwargs...)
+function hmc!(
+    integrator,
+    next_position,
+    position,
+    momenta,
+    ldg,
+    gradient,
+    stepsize,
+    steps,
+    maxdeltaH;
+    kwargs...,
+)
+    # TODO(ear) needs updating to current interface
     T = eltype(position)
     next_position .= position
 
-    lp = ldg(position, gradient; kwargs...)
+    lp, gradient = ldg(position; kwargs...)
     H1 = hamiltonian(lp, momenta)
     isnan(H1) && (H1 = typemin(T))
 
-    integrate!(integrator, ldg, position, momenta, gradient, stepsize, steps; kwargs...)
+    integrate!(ldg, position, momenta, gradient, stepsize, steps; kwargs...)
 
     H2 = hamiltonian(lp, momenta)
     isnan(H2) && (H2 = typemin(T))
@@ -17,15 +28,24 @@ function hmc!(integrator, next_position, position, momenta, ldg, gradient, steps
     accepted = rand(rng, T) < a
     accepted && (next_position .= position)
 
-    return (;
-            accepted,
-            divergent,
-            acceptstat = a
-            )
+    return (; accepted, divergent, acceptstat=a)
 end
 
-function pghmc!(integrator, next_position, position, momenta, ldg, gradient, stepsize, acceptance_probability, δ, nonreversible_update, maxdeltaH;
-                kwargs...)
+function pghmc!(
+    integrator,
+    next_position,
+    position,
+    momenta,
+    ldg,
+    gradient,
+    stepsize,
+    acceptance_probability,
+    δ,
+    nonreversible_update,
+    maxdeltaH;
+    kwargs...,
+)
+    # TODO(ear) needs updating to current interface
     T = eltype(position)
     next_position .= position
     next_momenta .= momenta
@@ -41,7 +61,7 @@ function pghmc!(integrator, next_position, position, momenta, ldg, gradient, ste
     divergent = divergence(H2, H1, maxdeltaH)
 
     a = H1 + H2
-    accepted =  log(abs(acceptance_probability)) < a
+    accepted = log(abs(acceptance_probability)) < a
     if accepted
         next_position .= position
         next_momenta .= momenta
@@ -56,11 +76,7 @@ function pghmc!(integrator, next_position, position, momenta, ldg, gradient, ste
         rand(rng, T)
     end
 
-    return (;
-            accepted,
-            divergent,
-            acceptstat = abs(acceptance_probability)
-            )
+    return (; accepted, divergent, acceptstat=abs(acceptance_probability))
 end
 
 function rand_momentum(rng, dims, metric)
@@ -69,4 +85,29 @@ end
 
 function hamiltonian(ld, momenta, metric)
     return -ld + dot(momenta, Diagonal(metric), momenta) / 2
+end
+
+function hamiltonian(ld, momenta)
+    return -ld + dot(momenta, momenta) / 2
+end
+
+function log1pexp(a)
+    a > zero(a) && return a + log1p(exp(-a))
+    return log1p(exp(a))
+end
+
+function logsumexp(a, b)
+    T = typeof(a)
+    a == typemin(T) && return b
+    isinf(a) && isinf(b) && return typemax(T)
+    a > b && return a + log1pexp(b - a)
+    return b + log1pexp(a - b)
+end
+
+function logsumexp(v::AbstractVector)
+    T = eltype(v)
+    length(v) == 0 && return typemin(T)
+    m = maximum(v)
+    isinf(m) && return m
+    return m + log(sum(vi -> exp(vi - m), v))
 end

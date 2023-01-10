@@ -1,6 +1,6 @@
 abstract type AbstractSGA{T} <: AbstractSamlper{T} end
 
-mutable struct ChEES{T <: AbstractFloat} <: AbstractSGA
+mutable struct ChEES{T<:AbstractFloat} <: AbstractSGA
     γ::T
     adam_ε::Adam{T}
     adam_τ::Adam{T}
@@ -12,7 +12,7 @@ mutable struct ChEES{T <: AbstractFloat} <: AbstractSGA
     const maxtreedepth::Int
 end
 
-mutable struct SNAPER{T <: AbstractFloat} <: AbstractSGA
+mutable struct SNAPER{T<:AbstractFloat} <: AbstractSGA
     γ::T
     adam_ε::Adam{T}
     adam_τ::Adam{T}
@@ -33,17 +33,17 @@ function transition!(sga::AbstractSGA, i, draws; kwargs...)
             update_info!(sga, i, info)
         end
     end
-    adapt_chains!(sga, i, draws)
+    return adapt_chains!(sga, i, draws)
 end
 
 function adapt_chains!(sga::SGA, i, draws; kwargs...)
     # copy from MCBayes/src/sga.jl
     # ...
-    adapt_metric!(sga, i, draws; kwargs...)
+    return adapt_metric!(sga, i, draws; kwargs...)
 end
 
 function adapt_metric!(sga::SGA, i, draws; kwargs...)
     update!(sga.om, draws[i, :, :]; kwargs...)
-    η = i ^ sga.γ               # ημ = 1 / (ceil(numchains * i / sga.κ) + 1)
-    sga.metric .= η .* sga.om.v .+ (1 - η) .* sga.metric
+    η = i^sga.γ               # ημ = 1 / (ceil(numchains * i / sga.κ) + 1)
+    return sga.metric .= η .* sga.om.v .+ (1 - η) .* sga.metric
 end

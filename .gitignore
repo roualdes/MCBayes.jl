@@ -24,8 +24,8 @@ docs/site/
 Manifest.toml
 
 
+# Julia
 .juliahistory
-.DS_Store
+build/
 
-notes.org
-play.jl
+.DS_Store

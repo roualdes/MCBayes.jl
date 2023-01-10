@@ -1,13 +1,15 @@
-abstract type AbstractSampler{T <: AbstractFloat} end
+abstract type AbstractSampler{T<:AbstractFloat} end
 
-
-function sample(sampler::AbstractSampler{T}, ldg;
-                iterations = 2000,
-                warmup = div(iterations, 2),
-                rng = Tuple(Random.Xoshiro(rand(UInt32)) for _ in 1:sampler.chains);
-                kwargs...) where {T <: AbstractFloat}
+function sample(
+    sampler::AbstractSampler{T},
+    ldg;
+    iterations=2000,
+    warmup=div(iterations, 2),
+    rng=Tuple(Random.Xoshiro(rand(UInt32)) for _ in 1:(sampler.chains));
+    kwargs...,
+) where {T<:AbstractFloat}
     M = iterations + warmup
-    draws = Array{T, 3}(undef, iterations, sampler.chains, sampler.dims)
+    draws = Array{T,3}(undef, iterations, sampler.chains, sampler.dims)
     diagnostics = preallocate_diagnostics(sampler; kwargs...) # TODO(ear) implement
     initialize_draws!(sampler, ldg, draws; kwargs...)
     initialize_stepsize!(sampler, ldg, draws; kwargs...)
