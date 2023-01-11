@@ -23,7 +23,7 @@ function StepsizeAdam(
 ) where {T}
     chains = length(initial_stepsize)
     adam = Adam(chains, T; kwargs...)
-    return StepsizeAdam(adam, initial_stepsize, zeros(T, chains), initializer)
+    return StepsizeAdam(adam, initial_stepsize, zero(initial_stepsize), initializer)
 end
 
 """
@@ -60,7 +60,7 @@ function StepsizeDualAverage(
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
     da = DualAverage(chains, T; kwargs...)
-    return StepsizeDualAverage(da, initial_stepsize, zeros(T, chains), initializer)
+    return StepsizeDualAverage(da, initial_stepsize, zero(initial_stepsize), initializer)
 end
 
 function update!(ssa::StepsizeDualAverage, αs; kwargs...)

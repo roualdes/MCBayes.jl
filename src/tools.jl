@@ -91,6 +91,17 @@ function hamiltonian(ld, momenta)
     return -ld + dot(momenta, momenta) / 2
 end
 
+function halton(n::Int; base::Int = 2)
+    x = 0.0
+    s = 1.0
+    while n > 0
+        s /= base
+        n, r = divrem(n, base)
+        x += s*r
+    end
+    return x
+end
+
 function log1pexp(a)
     a > zero(a) && return a + log1p(exp(-a))
     return log1p(exp(a))

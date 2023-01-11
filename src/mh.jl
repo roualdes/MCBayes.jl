@@ -15,50 +15,27 @@ function MH(
 end
 
 function sample!(
-    sampler::MH{T},
+    sampler::MH,
     ld;
-    iterations=10000,
-    warmup=10000,
-    rngs=Random.Xoshiro.(rand(1:typemax(Int), sampler.chains)),
+    iterations=5000,
+    warmup=iterations,
     draws_initializer=:mh,
-    stepsize_initializer=:mh,
     stepsize_adapter=StepsizeDualAverage(
-        sampler.stepsize; initializer=stepsize_initializer, δ=0.3
+        sampler.stepsize; initializer=:mh, δ=0.3
     ),
-    trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
-) where {T<:AbstractFloat}
-    M = iterations + warmup
-    draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
-    diagnostics = trace(sampler, M + 1)
-
-    initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
-
-    @views initialize_stepsize!(
-        stepsize_adapter, sampler.metric, rngs, ld, draws[1, :, :]; kwargs...
     )
-    set_stepsize!(sampler, stepsize_adapter; kwargs...)
-
-    for m in 1:M
-        transition!(sampler, m, ld, draws, rngs, diagnostics; kwargs...)
-
-        adapt!(
-            sampler,
-            adaptation_schedule,
-            diagnostics,
-            m,
-            ld,
-            draws,
-            rngs,
-            metric_adapter,
-            stepsize_adapter,
-            trajectorylength_adapter;
-            kwargs...,
-        )
-    end
-    return draws, diagnostics, rngs
+    return run_sampler!(sampler,
+                        ld;
+                        iterations,
+                        warmup,
+                        draws_initializer,
+                        stepsize_adapter,
+                        metric_adapter,
+                        adaptation_schedule,
+                        kwargs...)
 end
 
 function transition!(sampler::MH, m, ld, draws, rngs, trace; kwargs...)

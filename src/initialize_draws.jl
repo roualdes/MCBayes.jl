@@ -6,9 +6,9 @@ end
 
 function initialize_draws!(::Val{:mh}, draws, rngs, ld; radius=2, kwargs...)
     T = eltype(draws)
-    dims = size(draws, 2)
-    for chain in axes(draws, 3)
-        @views draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
+    _, dims, chains = size(draws)
+    for chain in 1:chains
+        draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
     end
 end
 
@@ -49,21 +49,28 @@ function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs
     return q
 end
 
-# TODO needs a second look
-# function initialize_draws!(::Val{:sga}, draws, rng, ldg;
-#                            steps = 100,
-#                            number_threads = Threads.nthreads(),
-#                            kwargs...)
-#     chains = size(draws, 3)
-#     @sync for it in 1:number_threads
-#         Threads.@spawn for chain in it:number_threads:chains
-#             for s in 1:steps
-#                 _ = ldg(draws[1, :, chain], gradients[:, chain])
-#                 draws[1, :, chain] .-= update!(initialize_draws_adam, gradients[:, chain], s)
-#             end
-#         end
-#     end
-# end
+function initialize_draws!(::Val{:adam}, draws, rngs, ldg;
+                           radius=2,
+                           steps = 100,
+                           number_threads = Threads.nthreads(),
+                           kwargs...)
+    T = eltype(draws)
+    _, dims, chains = size(draws)
+    for chain in 1:chains
+        draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
+    end
+
+    adms = Adam(chains, T=T)
+    @sync for it in 1:number_threads
+        Threads.@spawn for chain in it:number_threads:chains
+            for s in 1:steps
+                q = draws[1, :, chain]
+                ld, gradient = ldg(q; kwargs...)
+                draws[1, :, chain] .-= update!(adms[chain], gradient, s)
+            end
+        end
+    end
+end
 
 function initialize_draws!(
     ::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...
