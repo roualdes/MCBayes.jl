@@ -37,15 +37,15 @@ function prepare_log_density(bridgestan_model)
     end
 end
 
-function constrain_draws(bridgestan_model, draws, warmup; include_tp = false)
+function constrain_draws(bridgestan_model, draws, warmup; include_tp=false)
     return mapslices(
-        q -> BS.param_constrain(bridgestan_model, q; include_tp = include_tp),
-        draws[warmup+1:end, :, :];
-        dims=2
+        q -> BS.param_constrain(bridgestan_model, q; include_tp=include_tp),
+        draws[(warmup + 1):end, :, :];
+        dims=2,
     )
 end
 
-function check_means(constrained_draws, true_means; z = 5)
+function check_means(constrained_draws, true_means; z=5)
     m = reshape(mean(constrained_draws; dims=(1, 3)), :)
     err_m = reshape(mcse_mean(constrained_draws), :)
     l = length(true_means)
@@ -53,11 +53,15 @@ function check_means(constrained_draws, true_means; z = 5)
         return all(m .- z .* err_m .< true_means .< m .+ z .* err_m)
     else
         l -= 1
-        return all(m[end-l:end] .- z .* err_m[end-l:end] .< true_means .< m[end-l:end] .+ z .* err_m[end-l:end])
+        return all(
+            m[(end - l):end] .- z .* err_m[(end - l):end] .<
+            true_means .<
+            m[(end - l):end] .+ z .* err_m[(end - l):end],
+        )
     end
 end
 
-function check_stds(constrained_draws, true_stds; z = 5)
+function check_stds(constrained_draws, true_stds; z=5)
     s = reshape(std(constrained_draws; dims=(1, 3)), :)
     err_std = reshape(mcse_std(constrained_draws), :)
     l = length(true_stds)
@@ -65,7 +69,11 @@ function check_stds(constrained_draws, true_stds; z = 5)
         return all(s .- z .* err_std .< true_stds .< s .+ z .* err_std)
     else
         l -= 1
-        return all(s[end-l:end] .- z .* err_std[end-l:end] .< true_stds .< s[end-l:end] .+ z .* err_std[end-l:end])
+        return all(
+            s[(end - l):end] .- z .* err_std[(end - l):end] .<
+            true_stds .<
+            s[(end - l):end] .+ z .* err_std[(end - l):end],
+        )
     end
 end
 

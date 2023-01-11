@@ -9,9 +9,7 @@
         ld = prepare_log_density(bsm)
 
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -25,9 +23,7 @@
         ld = prepare_log_density(bsm)
 
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -41,9 +37,7 @@
         ld = prepare_log_density(bsm)
 
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -58,10 +52,9 @@
 
         ssda = StepsizeDualAverage(ones(4); δ=0.6, initializer=:mh)
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           stepsize_adapter = ssda,
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(
+            mh, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
+        )
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -99,9 +92,7 @@
         ld = prepare_log_density(bsm)
 
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -119,10 +110,9 @@
 
         ssda = StepsizeDualAverage(ones(4); δ=0.6, initializer=:mh)
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           stepsize_adapter = ssda,
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(
+            mh, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
+        )
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -136,9 +126,7 @@
         ld = prepare_log_density(bsm)
 
         mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld;
-                                           warmup=warmup,
-                                           iterations=iterations)
+        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
         true_means = expectations[model_name][:true_mean]
