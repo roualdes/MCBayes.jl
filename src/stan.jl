@@ -3,7 +3,6 @@ abstract type AbstractStan{T} <: AbstractSampler{T} end
 struct Stan{T} <: AbstractStan{T}
     metric::Matrix{T}
     stepsize::Vector{T}
-    seed::Vector{Int}
     dims::Int
     chains::Int
     maxtreedepth::Int
@@ -24,12 +23,11 @@ function Stan(
     T=Float64;
     metric=ones(T, dims, chains),
     stepsize=ones(T, chains),
-    seed=rand(1:typemax(Int), chains),
     maxtreedepth=10,
     maxdeltaH=convert(T, 1000),
 )
     D = convert(Int, dims)::Int
-    return Stan(metric, stepsize, seed, D, chains, maxtreedepth, maxdeltaH)
+    return Stan(metric, stepsize, D, chains, maxtreedepth, maxdeltaH)
 end
 
 """
@@ -46,7 +44,7 @@ function sample!(
     ldg;
     iterations=1000,
     warmup=1000,
-    rngs=Random.Xoshiro.(sampler.seed),
+    rngs=Random.Xoshiro.(rand(1:typemax(Int), sampler.chains)),
     draws_initializer=:stan,
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
     trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
@@ -435,7 +433,7 @@ function adapt!(
         # TODO(ear) this is attempting to plan ahead;
         # to actually use update!() will require
         # more arguments, for additional information on which
-        # the trajectorylength could be learned
+        # the trajectorylength could be learned; re SGA methods
         update!(trajectorylength_adapter; kwargs...)
         set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
 

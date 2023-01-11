@@ -3,7 +3,6 @@ abstract type AbstractMH{T} <: AbstractSampler{T} end
 struct MH{T} <: AbstractMH{T}
     metric::Matrix{T}
     stepsize::Vector{T}
-    seed::Vector{Int}
     dims::Int
     chains::Int
 end
@@ -13,11 +12,10 @@ function MH(
     chains=4,
     T=Float64;
     metric=ones(T, dims, chains),
-    stepsize=ones(T, chains),
-    seed=rand(1:typemax(Int), chains),
+    stepsize=ones(T, chains)
 )
     D = convert(Int, dims)::Int
-    return MH(metric, stepsize, seed, D, chains)
+    return MH(metric, stepsize, D, chains)
 end
 
 function sample!(
@@ -25,7 +23,7 @@ function sample!(
     ld;
     iterations=10000,
     warmup=10000,
-    rngs=Random.Xoshiro.(sampler.seed),
+    rngs=Random.Xoshiro.(rand(1:typemax(Int), sampler.chains)),
     draws_initializer=:mh,
     stepsize_initializer=:mh,
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize;
