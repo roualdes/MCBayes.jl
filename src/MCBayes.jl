@@ -81,10 +81,12 @@ function run_sampler!(
     trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
     metric_adapter=MetricConstant(sampler.metric),
     damping_adapter=DampingConstant(1 ./ sampler.stepsize),
-    noise_adapter=NoiseConstant(1 .- exp.(-2 .* damping_adapter.damping .* stepsize_adapter.stepsize)),
+    noise_adapter=NoiseConstant(
+        1 .- exp.(-2 .* damping_adapter.damping .* stepsize_adapter.stepsize)
+    ),
     drift_adapter=DriftConstant(noise_adapter.noise ./ 2),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
-    kwargs...
+    kwargs...,
 ) where {T<:AbstractFloat}
     M = iterations + warmup
     draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
@@ -168,7 +170,6 @@ function adapt!(
         set_stepsize!(sampler, stepsize_adapter; smoothed=true, kwargs...)
     end
 end
-
 
 # precompile
 function ldg(x)

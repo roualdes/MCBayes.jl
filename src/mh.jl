@@ -20,22 +20,22 @@ function sample!(
     iterations=5000,
     warmup=iterations,
     draws_initializer=:mh,
-    stepsize_adapter=StepsizeDualAverage(
-        sampler.stepsize; initializer=:mh, δ=0.3
-    ),
+    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; initializer=:mh, δ=0.3),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
+)
+    return run_sampler!(
+        sampler,
+        ld;
+        iterations,
+        warmup,
+        draws_initializer,
+        stepsize_adapter,
+        metric_adapter,
+        adaptation_schedule,
+        kwargs...,
     )
-    return run_sampler!(sampler,
-                        ld;
-                        iterations,
-                        warmup,
-                        draws_initializer,
-                        stepsize_adapter,
-                        metric_adapter,
-                        adaptation_schedule,
-                        kwargs...)
 end
 
 function transition!(sampler::MH, m, ld, draws, rngs, trace; kwargs...)

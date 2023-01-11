@@ -49,18 +49,23 @@ function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs
     return q
 end
 
-function initialize_draws!(::Val{:adam}, draws, rngs, ldg;
-                           radius=2,
-                           steps = 100,
-                           number_threads = Threads.nthreads(),
-                           kwargs...)
+function initialize_draws!(
+    ::Val{:adam},
+    draws,
+    rngs,
+    ldg;
+    radius=2,
+    steps=100,
+    number_threads=Threads.nthreads(),
+    kwargs...,
+)
     T = eltype(draws)
     _, dims, chains = size(draws)
     for chain in 1:chains
         draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
     end
 
-    adms = Adam(chains, T=T)
+    adms = Adam(chains; T=T)
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
             for s in 1:steps

@@ -30,24 +30,28 @@ function Stan(
     return Stan(metric, stepsize, D, chains, maxtreedepth, maxdeltaH)
 end
 
-function sample!(sampler::Stan,
-                 ldg;
-                 iterations=1000,
-                 warmup=iterations,
-                 draws_initializer=:stan,
-                 stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
-                 metric_adapter=MetricOnlineMoments(sampler.metric),
-                 adaptation_schedule=WindowedAdaptationSchedule(warmup),
-                 kwargs...,)
-    return run_sampler!(sampler,
-                        ldg;
-                        iterations,
-                        warmup,
-                        draws_initializer,
-                        stepsize_adapter,
-                        metric_adapter,
-                        adaptation_schedule,
-                        kwargs...)
+function sample!(
+    sampler::Stan,
+    ldg;
+    iterations=1000,
+    warmup=iterations,
+    draws_initializer=:stan,
+    stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
+    metric_adapter=MetricOnlineMoments(sampler.metric),
+    adaptation_schedule=WindowedAdaptationSchedule(warmup),
+    kwargs...,
+)
+    return run_sampler!(
+        sampler,
+        ldg;
+        iterations,
+        warmup,
+        draws_initializer,
+        stepsize_adapter,
+        metric_adapter,
+        adaptation_schedule,
+        kwargs...,
+    )
 end
 
 function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
