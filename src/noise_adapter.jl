@@ -7,7 +7,7 @@ function optimum(neca::AbstractNoiseAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_stepsize!(sampler, neca::AbstractNoiseAdapter; smoothed=false, kwargs...)
+function set_noise!(sampler, neca::AbstractNoiseAdapter; smoothed=false, kwargs...)
     sampler.noise .= smoothed ? optimum(neca) : neca.noise
 end
 
@@ -20,13 +20,22 @@ function NoiseECA(initial_noise::AbstractVector{T}; kwargs...) where {T}
     return NoiseECA(initial_noise, zero(initial_noise))
 end
 
-function update!(neca::NoiseECA, damping, stepsize; kwargs...)
-    neca.noise .= 1 .- exp.(-2 .* damping .* stepsize)
+function update!(neca::NoiseECA, damping; kwargs...)
+    neca.noise .= sqrt(1 .- exp.(-2 .* damping))
     neca.noise_bar .= neca.noise
+end
+
+function update!(neca::NoiseECA, damping, idx; kwargs...)
+    neca.noise[idx] = sqrt(1 - exp.(-2 * damping[idx]))
+    neca.noise_bar[idx] = neca.noise[idx]
 end
 
 function reset!(neca::NoiseECA; kwargs...)
     neca.noise_bar .= 0
+end
+
+function set_noise!(sampler, neca::NoiseECA, idx; kwargs...)
+    sampler.noise[idx] = neca.noise[idx]
 end
 
 struct NoiseConstant{T<:AbstractFloat} <: AbstractNoiseAdapter{T}

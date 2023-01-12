@@ -1,21 +1,21 @@
 struct Adam{T<:AbstractFloat}
     m::Vector{T}
     v::Vector{T}
-    α::Vector{T}
-    β1::Vector{T}
-    β2::Vector{T}
-    ι::Vector{T}
+    α::T
+    β1::T
+    β2::T
+    ι::T
     schedule::Symbol
 end
 
-function Adam(chains, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, schedule=:constant)
+function Adam(dims, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, schedule=:constant)
     return Adam(
-        zeros(T, chains),
-        zeros(T, chains),
-        fill(convert(T, α)::T, chains),
-        fill(convert(T, β1)::T, chains),
-        fill(convert(T, β2)::T, chains),
-        fill(convert(T, ι)::T, chains),
+        zeros(T, dims),
+        zeros(T, dims),
+        convert(T, α)::T,
+        convert(T, β1)::T,
+        convert(T, β2)::T,
+        convert(T, ι)::T,
         schedule,
     )
 end
@@ -30,7 +30,7 @@ function update!(adm::Adam, g, t; kwargs...)
     warmup = get(kwargs, :warmup, 1000)
     lr = learningrate(adm.schedule, t, adm.α, warmup)
     a = lr * sqrt(1 - adm.β2^t) / (1 - adm.β1^t)
-    return a * adm.m / (sqrt(adm.v) + adm.ι)
+    return a .* adm.m ./ (sqrt.(adm.v) .+ adm.ι)
 end
 
 function reset!(adm::Adam; initial_stepsize=1, kwargs...)

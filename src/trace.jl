@@ -1,5 +1,5 @@
 function record!(trace::NamedTuple, info, iteration, chain)
-    keys = (:accepted, :divergence, :energy, :stepsize, :acceptstat, :treedepth, :leapfrog)
+    keys = (:accepted, :divergence, :energy, :stepsize, :acceptstat, :treedepth, :leapfrog, :damping, :noise, :drift)
     for k in keys
         if haskey(info, k)
             trace[k][iteration, chain] = info[k]
@@ -26,5 +26,18 @@ function trace(sampler::MH{T}, iterations) where {T}
         acceptstat=zeros(T, iterations, chains),
         accepted=zeros(Bool, iterations, chains),
         stepsize=zeros(T, iterations, chains),
+    )
+end
+
+
+function trace(sampler::MEADS{T}, iterations) where {T}
+    chains = sampler.chains
+    return (;
+            acceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            divergence=zeros(Bool, iterations, chains)
+            # TODO want damping, noise, drift?
     )
 end

@@ -33,7 +33,7 @@ struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
 end
 
-function MetricConstant(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
+function MetricConstant(initial_metric::AbstractMatrix; kwargs...)
     return MetricConstant(initial_metric)
 end
 
@@ -44,3 +44,12 @@ function optimum(mc::MetricConstant; kwargs...)
 end
 
 function reset!(mc::MetricConstant; kwargs...) end
+
+
+struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
+    metric::Matrix{T}
+end
+
+function MetricECA(initial_metric::AbstractMatrix; kwargs...)
+    return MetricECA(initial_metric)
+end

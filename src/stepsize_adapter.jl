@@ -94,3 +94,31 @@ end
 function update!(ssc::StepsizeConstant, αs; kwargs...) end
 
 function reset!(ssc::StepsizeConstant; kwargs...) end
+
+struct StepsizeECA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
+    stepsize::Vector{T}
+    stepsize_bar::Vector{T}
+    initializer::Symbol
+end
+
+function StepsizeECA(initial_stepsize::AbstractVector{T}; initializer=:none, kwargs...) where {T<:AbstractFloat}
+    return StepsizeECA(initial_stepsize, zero(initial_stepsize), initializer)
+end
+
+function update!(seca::StepsizeECA, ldg, positions, fold, scale, idx; kwargs...)
+    dims, chains = size(positions)
+    ld = zero(eltype(positions))
+    gradients = zero(positions)
+    for chain in fold
+        ld, gradients[:, chain] = ldg(positions[:, chain]; kwargs...)
+    end
+    scaled_gradients = gradients .* scale
+    seca.stepsize[idx] =  min(1, 0.5 / sqrt(max_eigenvalue(scaled_gradients')))
+    seca.stepsize_bar[idx] = seca.stepsize[idx]
+end
+
+function reset!(seca::StepsizeECA; kwargs...) end
+
+function set_stepsize!(sampler, seca::StepsizeECA, f; kwargs...)
+    sampler.stepsize[f] = seca.stepsize[f]
+end

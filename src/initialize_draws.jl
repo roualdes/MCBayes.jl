@@ -65,13 +65,13 @@ function initialize_draws!(
         draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
     end
 
-    adms = Adam(chains; T=T)
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
+            adm = Adam(dims, T)
             for s in 1:steps
                 q = draws[1, :, chain]
                 ld, gradient = ldg(q; kwargs...)
-                draws[1, :, chain] .-= update!(adms[chain], gradient, s)
+                draws[1, :, chain] .-= update!(adm, gradient, s)
             end
         end
     end

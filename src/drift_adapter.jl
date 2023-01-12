@@ -7,7 +7,7 @@ function optimum(deca::AbstractDriftAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_stepsize!(sampler, deca::AbstractDriftAdapter; smoothed=false, kwargs...)
+function set_drift!(sampler, deca::AbstractDriftAdapter; smoothed=false, kwargs...)
     sampler.drift .= smoothed ? optimum(deca) : deca.drift
 end
 
@@ -21,12 +21,21 @@ function DriftECA(initial_drift::AbstractVector; kwargs...)
 end
 
 function update!(deca::DriftECA, noise; kwargs...)
-    deca.drift .= noise ./ 2
+    deca.drift .= noise .^ 2 ./ 2
     deca.drift_bar .= deca.drift
+end
+
+function update!(deca::DriftECA, noise, idx; kwargs...)
+    deca.drift[idx] = noise[idx] ^ 2 / 2
+    deca.drift_bar[idx] = deca.drift[idx]
 end
 
 function reset!(deca::DriftECA; kwargs...)
     deca.drift_bar .= 0
+end
+
+function set_drift!(sampler, deca::DriftECA, idx; kwargs...)
+    sampler.drift[idx] = deca.drift[idx]
 end
 
 struct DriftConstant{T<:AbstractFloat} <: AbstractDriftAdapter{T}

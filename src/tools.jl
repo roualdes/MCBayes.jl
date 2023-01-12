@@ -32,51 +32,57 @@ function hmc!(
 end
 
 function pghmc!(
-    integrator,
-    next_position,
     position,
-    momenta,
+    position_next,
+    momentum,
     ldg,
-    gradient,
+    rng,
+    dims,
+    metric,
     stepsize,
     acceptance_probability,
-    δ,
-    nonreversible_update,
-    maxdeltaH;
+    noise,
+    drift,
+    nonreversible_update;
     kwargs...,
 )
-    # TODO(ear) needs updating to current interface
     T = eltype(position)
-    next_position .= position
-    next_momenta .= momenta
+    position_next .= position
+    momentum_next = copy(momentum)
 
-    lp = ldg(position, gradient; kwargs...)
-    H1 = hamiltonian(lp, momenta)
-    isnan(H1) && (H1 = typemin(T))
+    ld, gradient = ldg(position_next; kwargs...)
+    H0 = hamiltonian(ld, momentum_next)
+    isnan(H0) && (H0 = typemax(T))
 
-    integrate!(integrator, ldg, position, momenta, gradient, stepsize, 1; kwargs...)
+    ld, gradient = leapfrog!(position_next, momentum_next, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...)
 
-    H2 = hamiltonian(lp, momenta)
-    isnan(H2) && (H2 = typemin(T))
-    divergent = divergence(H2, H1, maxdeltaH)
+    H = hamiltonian(ld, momentum_next)
+    isnan(H) && (H = typemax(T))
+    divergent = (H -  H0)
 
-    a = H1 + H2
-    accepted = log(abs(acceptance_probability)) < a
+    a = H0 - H
+    accepted = log(abs(acceptance_probability[])) < a
     if accepted
-        next_position .= position
-        next_momenta .= momenta
-        acceptance_probability *= exp(-a)
+        position_next .= position
+        momentum_next .= momentum
+        acceptance_probability[] *= exp(-a)
     else
-        next_momenta .*= -1
+        momentum_next .*= -1
     end
+    momentum_next .= sqrt.(1 .- noise .^ 2) .* momentum_next .+ noise .* randn(rng, T, dims)
 
-    acceptance_probability = if nonreversible_update
-        (acceptance_probability + 1 + δ) % 2 - 1
+    acceptance_probability[] = if nonreversible_update
+        (acceptance_probability[] + 1 + drift) % 2 - 1
     else
         rand(rng, T)
     end
 
-    return (; accepted, divergent, acceptstat=abs(acceptance_probability))
+    return (;
+            accepted,
+            divergent,
+            energy=hamiltonian(ld, momentum_next),
+            acceptstat=a > zero(a) ? one(a) : exp(a),
+    )
 end
 
 function rand_momentum(rng, dims, metric)
@@ -121,4 +127,20 @@ function logsumexp(v::AbstractVector)
     m = maximum(v)
     isinf(m) && return m
     return m + log(sum(vi -> exp(vi - m), v))
+end
+
+function max_eigenvalue(x)
+    N = size(x, 1)
+    trace_est = sum(z -> z ^ 2, x)
+    trace_sq_est = sum(z -> z ^ 2, x * x') / N
+    return trace_sq_est / trace_est
+end
+
+function standardize_draws(positions, kfold)
+    z = positions[:, kfold]
+    scale = std(z, dims = 2)
+    z ./= scale
+    location = mean(z, dims = 2)
+    z .-= location
+    return z, scale
 end
