@@ -23,6 +23,7 @@ include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
 
+include("initialize_sampler.jl")
 include("initialize_draws.jl")
 include("initialize_stepsize.jl")
 
@@ -81,14 +82,28 @@ function run_sampler!(
     ldg;
     iterations=1000,
     warmup=iterations,
-    rngs=Random.Xoshiro.(rand(1:typemax(Int), sampler.chains)),
+    rngs=Random.Xoshiro.(
+        rand(1:typemax(Int), hasfield(typeof(sampler), :chains) ? sampler.chains : 4)
+    ),
     draws_initializer=:stan,
-    stepsize_adapter=StepsizeConstant(sampler.stepsize),
-    trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
-    metric_adapter=MetricConstant(sampler.metric),
-    damping_adapter=DampingConstant(hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)),
-    noise_adapter=NoiseConstant(hasfield(typeof(sampler), :noise) ? sampler.noise : zeros(1)),
-    drift_adapter=DriftConstant(hasfield(typeof(sampler), :drift) ? sampler.drift : zeros(1)),
+    stepsize_adapter=StepsizeConstant(
+        hasfield(typeof(sampler), :stepsize) ? sampler.stepsize : ones(1)
+    ),
+    trajectorylength_adapter=TrajectorylengthConstant(
+        hasfield(typeof(sampler), :trajectorylength) ? sampler.trajectorylength : ones(1)
+    ),
+    metric_adapter=MetricConstant(
+        hasfield(typeof(sampler), :metric) ? sampler.metric : ones(1)
+    ),
+    damping_adapter=DampingConstant(
+        hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)
+    ),
+    noise_adapter=NoiseConstant(
+        hasfield(typeof(sampler), :noise) ? sampler.noise : zeros(1)
+    ),
+    drift_adapter=DriftConstant(
+        hasfield(typeof(sampler), :drift) ? sampler.drift : zeros(1)
+    ),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
 ) where {T<:AbstractFloat}
@@ -96,13 +111,15 @@ function run_sampler!(
     draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
     diagnostics = trace(sampler, M + 1)
 
-    # initialize_sampler!(sampler,
-    #                     stepsize_adapter,
-    #                     trajectorylength_adapter,
-    #                     metric_adapter,
-    #                     damping_adapter,
-    #                     noise_adapter,
-    #                     drift_adapter)
+    initialize_sampler!(
+        sampler,
+        stepsize_adapter,
+        trajectorylength_adapter,
+        metric_adapter,
+        damping_adapter,
+        noise_adapter,
+        drift_adapter,
+    )
 
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 

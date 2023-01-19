@@ -11,7 +11,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -25,7 +25,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -39,7 +39,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -51,13 +51,11 @@
         ldg = prepare_log_density_gradient(bsm)
 
         meads = MEADS(dims)
-        draws, diagnostics, rngs = sample!(
-            meads, ldg; warmup=warmup, iterations=iterations
-        )
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means, z = 6)
+        @test check_means(constrained_draws, true_means, z=6)
     end
 
     @testset "highd_mvnormal" begin
@@ -69,7 +67,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -86,7 +84,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -101,11 +99,9 @@
         ldg = prepare_log_density_gradient(bsm)
 
         meads = MEADS(dims)
-        draws, diagnostics, rngs = sample!(
-            meads, ldg; warmup=warmup, iterations=iterations
-        )
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -119,7 +115,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true, thin = 10)
+        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true, thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 

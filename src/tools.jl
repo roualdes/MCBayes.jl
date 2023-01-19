@@ -45,7 +45,7 @@ function pghmc!(
     drift,
     nonreversible_update,
     maxdeltaH;
-    kwargs...
+    kwargs...,
 )
     T = eltype(position)
     q = copy(position)
@@ -80,12 +80,7 @@ function pghmc!(
         rand(rng, T)
     end
 
-    return (;
-            accepted,
-            divergent,
-            energy,
-            acceptstat=a > zero(a) ? one(a) : exp(a),
-    )
+    return (; accepted, divergent, energy, acceptstat=a > zero(a) ? one(a) : exp(a))
 end
 
 function rand_momentum(rng, dims, metric)
@@ -134,15 +129,15 @@ end
 
 function max_eigenvalue(x)
     N = size(x, 2)
-    trace_est = sum(z -> z ^ 2, x)
-    trace_sq_est = sum(z -> z ^ 2, x' * x) / N
+    trace_est = sum(z -> z^2, x)
+    trace_sq_est = sum(z -> z^2, x' * x) / N
     return trace_sq_est / trace_est
 end
 
 function standardize_draws(x)
-    scale = std(x, dims = 2)
+    scale = std(x; dims=2)
     z = x ./ scale
-    location = mean(z, dims = 2)
+    location = mean(z; dims=2)
     z .-= location
     return z, scale
 end

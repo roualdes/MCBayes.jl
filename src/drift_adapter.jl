@@ -26,7 +26,7 @@ function update!(deca::DriftECA, noise; kwargs...)
 end
 
 function update!(deca::DriftECA, noise, idx; kwargs...)
-    deca.drift[idx] = noise[idx] ^ 2 / 2
+    deca.drift[idx] = noise[idx]^2 / 2
     deca.drift_bar[idx] = deca.drift[idx]
 end
 

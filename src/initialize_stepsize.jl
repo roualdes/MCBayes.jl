@@ -14,7 +14,9 @@ end
 function init_stepsize!(
     method::Symbol, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
 )
-    init_stepsize!(Val{method}(), stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
+    init_stepsize!(
+        Val{method}(), stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
+    )
 end
 
 function init_stepsize!(
@@ -100,13 +102,15 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     return stepsize
 end
 
-function init_stepsize!(::Val{:meads}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...)
-    for f in 1:sampler.folds
+function init_stepsize!(
+    ::Val{:meads}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...
+)
+    for f in 1:(sampler.folds)
         k = (f + 1) % sampler.folds + 1
         kfold = sampler.partition[:, k]
 
         q = positions[:, kfold]
-        sigma = std(q, dims = 2)
+        sigma = std(q; dims=2)
 
         update!(stepsize_adapter, ldg, q, sigma, f; kwargs...)
     end

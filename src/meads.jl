@@ -37,7 +37,7 @@ function MEADS(
     metric=ones(T, dims, folds),
     stepsize=ones(T, folds) / 2,
     nru=true,
-    maxdeltaH=convert(T, 1000)
+    maxdeltaH=convert(T, 1000),
 )
     D = convert(Int, dims)::Int
     chains = folds * chainsperfold
@@ -61,7 +61,7 @@ function MEADS(
         folds,
         chainsperfold,
         chains,
-        maxdeltaH
+        maxdeltaH,
     )
 end
 
@@ -76,17 +76,18 @@ function sample!(
     drift_adapter=DriftECA(sampler.drift),
     adaptation_schedule=EnsembleChainSchedule(),
     kwargs...,
-    )
-    return run_sampler!(sampler,
-                        ldg;
-                        draws_initializer,
-                        stepsize_adapter,
-                        metric_adapter,
-                        damping_adapter,
-                        noise_adapter,
-                        drift_adapter,
-                        adaptation_schedule,
-                        kwargs...,
+)
+    return run_sampler!(
+        sampler,
+        ldg;
+        draws_initializer,
+        stepsize_adapter,
+        metric_adapter,
+        damping_adapter,
+        noise_adapter,
+        drift_adapter,
+        adaptation_schedule,
+        kwargs...,
     )
 end
 
@@ -99,7 +100,7 @@ function transition!(sampler::MEADS, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
 
     @sync for it in 1:nt
-        Threads.@spawn for f in it:nt:sampler.folds
+        Threads.@spawn for f in it:nt:(sampler.folds)
             k = (f + 1) % sampler.folds + 1
             kfold = sampler.partition[:, k]
 

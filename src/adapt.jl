@@ -33,12 +33,7 @@ function adapt!(
 
         if m == schedule.closewindow
             @views initialize_stepsize!(
-                stepsize_adapter,
-                sampler,
-                rngs,
-                ldg,
-                draws[m + 1, :, :];
-                kwargs...,
+                stepsize_adapter, sampler, rngs, ldg, draws[m + 1, :, :]; kwargs...
             )
             set_stepsize!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter; kwargs...)
@@ -68,13 +63,11 @@ function adapt!(
     noise_adapter,
     drift_adapter;
     kwargs...,
-    )
-
+)
     nt = get(kwargs, :threads, Threads.nthreads())
 
     @sync for it in 1:nt
-        Threads.@spawn for f in it:nt:sampler.folds
-
+        Threads.@spawn for f in it:nt:(sampler.folds)
             k = (f + 1) % sampler.folds + 1
             kfold = sampler.partition[:, k]
 

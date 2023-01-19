@@ -105,7 +105,9 @@ struct StepsizeECA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     initializer::Symbol
 end
 
-function StepsizeECA(initial_stepsize::AbstractVector{T}; initializer=:meads, kwargs...) where {T<:AbstractFloat}
+function StepsizeECA(
+    initial_stepsize::AbstractVector{T}; initializer=:meads, kwargs...
+) where {T<:AbstractFloat}
     return StepsizeECA(initial_stepsize, initial_stepsize, initializer)
 end
 
@@ -117,7 +119,7 @@ function update!(seca::StepsizeECA, ldg, positions, scale, idx; kwargs...)
         _, gradients[:, chain] = ldg(q; kwargs...)
     end
     scaled_gradients = gradients .* scale
-    seca.stepsize[idx] =  min(1, 0.5 / sqrt(max_eigenvalue(scaled_gradients)))
+    seca.stepsize[idx] = min(1, 0.5 / sqrt(max_eigenvalue(scaled_gradients)))
     seca.stepsize_bar[idx] = seca.stepsize[idx]
 end
 
