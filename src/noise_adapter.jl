@@ -26,7 +26,7 @@ function update!(neca::NoiseECA, damping; kwargs...)
 end
 
 function update!(neca::NoiseECA, damping, idx; kwargs...)
-    neca.noise[idx] = sqrt(1 - exp.(-2 * damping[idx]))
+    neca.noise[idx] = sqrt(1 - exp(-2 * damping[idx]))
     neca.noise_bar[idx] = neca.noise[idx]
 end
 
@@ -47,6 +47,8 @@ function NoiseConstant(initial_drift::AbstractVector; kwargs...)
     return NoiseConstant(initial_drift, initial_drift)
 end
 
-function update!(nc::NoiseConstant, damping, stepsize; kwargs...) end
+function set_noise!(sampler, nc::NoiseConstant, args...; kwargs...) end
+
+function update!(nc::NoiseConstant, args...; kwargs...) end
 
 function reset!(nc::NoiseConstant; kwargs...) end

@@ -21,7 +21,7 @@ function DampingECA(initial_damping::AbstractVector{T}; kwargs...) where {T}
 end
 
 function update!(deca::DampingECA, m, zpositions, stepsize, idx; kwargs...)
-    deca.damping[idx] = max(1 / m, stepsize[idx], sqrt(max_eigenvalue(zpositions)))
+    deca.damping[idx] = max(1 / m, stepsize[idx] / sqrt(max_eigenvalue(zpositions)))
     deca.damping_bar[idx] = deca.damping[idx]
 end
 

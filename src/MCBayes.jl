@@ -39,12 +39,15 @@ include("convergence.jl")
 
 export Stan,
     MH,
+    MEADS,
     OnlineMoments,
     MetricOnlineMoments,
     MetricConstant,
+    MetricECA,
     StepsizeAdam,
     StepsizeDualAverage,
     StepsizeConstant,
+    StepsizeECA,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
     DampingECA,
@@ -83,11 +86,9 @@ function run_sampler!(
     stepsize_adapter=StepsizeConstant(sampler.stepsize),
     trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
     metric_adapter=MetricConstant(sampler.metric),
-    damping_adapter=DampingConstant(1 ./ sampler.stepsize),
-    noise_adapter=NoiseConstant(
-        1 .- exp.(-2 .* damping_adapter.damping .* stepsize_adapter.stepsize)
-    ),
-    drift_adapter=DriftConstant(noise_adapter.noise ./ 2),
+    damping_adapter=DampingConstant(hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)),
+    noise_adapter=NoiseConstant(hasfield(typeof(sampler), :noise) ? sampler.noise : zeros(1)),
+    drift_adapter=DriftConstant(hasfield(typeof(sampler), :drift) ? sampler.drift : zeros(1)),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
 ) where {T<:AbstractFloat}
@@ -95,10 +96,18 @@ function run_sampler!(
     draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
     diagnostics = trace(sampler, M + 1)
 
+    # initialize_sampler!(sampler,
+    #                     stepsize_adapter,
+    #                     trajectorylength_adapter,
+    #                     metric_adapter,
+    #                     damping_adapter,
+    #                     noise_adapter,
+    #                     drift_adapter)
+
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 
     @views initialize_stepsize!(
-        stepsize_adapter, sampler.metric, rngs, ldg, draws[1, :, :]; kwargs...
+        stepsize_adapter, sampler, rngs, ldg, draws[1, :, :]; kwargs...
     )
     set_stepsize!(sampler, stepsize_adapter; kwargs...)
 
@@ -135,7 +144,7 @@ draws, diagnostics, rngs = sample!(stan, ldg)
 ess_mean(draws)
 rhat_basic(draws)
 
-mead = MEADS(10)
-draws, diagnostics, rngs = sample!(mead, ldg)
+meads = MEADS(10)
+draws, diagnostics, rngs = sample!(meads, ldg)
 
 end

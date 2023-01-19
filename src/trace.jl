@@ -35,7 +35,7 @@ function trace(sampler::MEADS{T}, iterations) where {T}
     return (;
             acceptstat=zeros(T, iterations, chains),
             accepted=zeros(Bool, iterations, chains),
-            stepsize=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, sampler.folds),
             energy=zeros(T, iterations, chains),
             divergence=zeros(Bool, iterations, chains)
             # TODO want damping, noise, drift?

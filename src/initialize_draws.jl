@@ -55,7 +55,7 @@ function initialize_draws!(
     rngs,
     ldg;
     radius=2,
-    steps=100,
+    adam_steps=100,
     number_threads=Threads.nthreads(),
     kwargs...,
 )
@@ -68,10 +68,10 @@ function initialize_draws!(
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
             adm = Adam(dims, T)
-            for s in 1:steps
+            for s in 1:adam_steps
                 q = draws[1, :, chain]
                 ld, gradient = ldg(q; kwargs...)
-                draws[1, :, chain] .-= update!(adm, gradient, s)
+                draws[1, :, chain] .+= update!(adm, gradient, s)
             end
         end
     end

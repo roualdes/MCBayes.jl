@@ -34,7 +34,7 @@ function adapt!(
         if m == schedule.closewindow
             @views initialize_stepsize!(
                 stepsize_adapter,
-                optimum(metric_adapter),
+                sampler,
                 rngs,
                 ldg,
                 draws[m + 1, :, :];
@@ -69,23 +69,24 @@ function adapt!(
     drift_adapter;
     kwargs...,
     )
-    
+
     nt = get(kwargs, :threads, Threads.nthreads())
 
     @sync for it in 1:nt
-        Threads.@spawn for f in it:nt:(sampler.folds)
+        Threads.@spawn for f in it:nt:sampler.folds
 
             k = (f + 1) % sampler.folds + 1
             kfold = sampler.partition[:, k]
 
-            positions = draws[m + 1, :, :]
-            z_positions, sigma = standardize_draws(positions, kfold)
+            positions = draws[m + 1, :, kfold]
+            z_positions, sigma = standardize_draws(positions)
 
-            sampler.metric[:, f] .= sigma .^ 2
-            
-            update!(stepsize_adapter, ldg, positions, kfold, sigma, f; kwargs...)
+            update!(metric_adapter, sigma .^ 2, f; kwargs...)
+            set_metric!(sampler, metric_adapter, f; kwargs...)
+
+            update!(stepsize_adapter, ldg, positions, sigma, f; kwargs...)
             set_stepsize!(sampler, stepsize_adapter, f; kwargs...)
-            
+
             update!(damping_adapter, m, z_positions, sampler.stepsize, f; kwargs...)
             set_damping!(sampler, damping_adapter, f; kwargs...)
 
@@ -97,6 +98,3 @@ function adapt!(
         end
     end
 end
-
-
-

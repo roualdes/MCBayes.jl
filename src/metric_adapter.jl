@@ -37,7 +37,7 @@ function MetricConstant(initial_metric::AbstractMatrix; kwargs...)
     return MetricConstant(initial_metric)
 end
 
-function update!(mc::MetricConstant, x::AbstractMatrix; kwargs...) end
+function update!(mc::MetricConstant, args...; kwargs...) end
 
 function optimum(mc::MetricConstant; kwargs...)
     return mc.metric
@@ -45,6 +45,9 @@ end
 
 function reset!(mc::MetricConstant; kwargs...) end
 
+function set_metric!(sampler, mc::MetricConstant, args...; kwargs...)
+    sampler.metric .= mc.metric
+end
 
 struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
@@ -52,4 +55,12 @@ end
 
 function MetricECA(initial_metric::AbstractMatrix; kwargs...)
     return MetricECA(initial_metric)
+end
+
+function update!(meca::MetricECA, sigma, idx; kwargs...)
+    meca.metric[:, idx] .= sigma
+end
+
+function set_metric!(sampler, meca::MetricECA, idx; kwargs...)
+    sampler.metric[:, idx] .= meca.metric[:, idx]
 end
