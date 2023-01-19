@@ -8,7 +8,7 @@ struct Adam{T<:AbstractFloat}
     schedule::Symbol
 end
 
-function Adam(dims, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, schedule=:constant)
+function Adam(dims, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, adam_schedule=:constant, kwargs...)
     return Adam(
         zeros(T, dims),
         zeros(T, dims),
@@ -16,7 +16,7 @@ function Adam(dims, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, schedule=:con
         convert(T, β1)::T,
         convert(T, β2)::T,
         convert(T, ι)::T,
-        schedule,
+        adam_schedule,
     )
 end
 
@@ -26,11 +26,12 @@ Adam update.
 function update!(adm::Adam, g, t; kwargs...)
     @. adm.m = adm.β1 * adm.m + (1 - adm.β1) * g
     @. adm.v = adm.β2 * adm.v + (1 - adm.β2) * g^2
-
-    warmup = get(kwargs, :warmup, 1000)
+    warmup = get(kwargs, :adam_warmup, 1000)
     lr = learningrate(adm.schedule, t, adm.α, warmup)
     a = lr * sqrt(1 - adm.β2^t) / (1 - adm.β1^t)
     return a .* adm.m ./ (sqrt.(adm.v) .+ adm.ι)
+    # TODO implement Adamw? adm.λ = 0.0001, x = previous state
+    # return a .* (adm.m ./ (sqrt.(adm.v) .+ adm.ι) .+ adm.λ .* x)
 end
 
 function reset!(adm::Adam; initial_stepsize=1, kwargs...)

@@ -37,10 +37,10 @@ function prepare_log_density(bridgestan_model)
     end
 end
 
-function constrain_draws(bridgestan_model, draws, warmup; include_tp=false)
+function constrain_draws(bridgestan_model, draws, warmup; include_tp=false, thin = 1)
     return mapslices(
         q -> BS.param_constrain(bridgestan_model, q; include_tp=include_tp),
-        draws[(warmup + 1):end, :, :];
+        draws[(warmup + 1):thin:end, :, :];
         dims=2,
     )
 end
@@ -82,6 +82,6 @@ modeldir = joinpath(artifact"test_models", "test_models")
 expectations = open(deserialize, joinpath(modeldir, "expectations.jls"))
 model_names = [f for f in readdir(modeldir) if isdir(joinpath(modeldir, f))]
 
-# include("mh.jl")
-# include("stan.jl")
+include("mh.jl")
+include("stan.jl")
 include("meads.jl")

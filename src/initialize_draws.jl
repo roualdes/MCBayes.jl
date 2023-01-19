@@ -61,18 +61,17 @@ function initialize_draws!(
 )
     T = eltype(draws)
     _, dims, chains = size(draws)
-    for chain in 1:chains
-        draws[1, :, chain] = radius .* (2 .* rand(rngs[chain], T, dims) .- 1)
-    end
+    draws[1, :, :] = zeros(T, dims, chains)
 
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
-            adm = Adam(dims, T)
+            adm = Adam(dims, T; kwargs...)
             for s in 1:adam_steps
                 q = draws[1, :, chain]
                 ld, gradient = ldg(q; kwargs...)
-                draws[1, :, chain] .+= update!(adm, gradient, s)
+                draws[1, :, chain] .-= update!(adm, -gradient, s)
             end
+            draws[1, :, chain] .+= randn(rngs[chain], T, dims) .* 0.1
         end
     end
 end

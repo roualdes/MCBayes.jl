@@ -36,7 +36,7 @@ function MEADS(
     T=Float64;
     metric=ones(T, dims, folds),
     stepsize=ones(T, folds) / 2,
-    nru=false,
+    nru=true,
     maxdeltaH=convert(T, 1000)
 )
     D = convert(Int, dims)::Int

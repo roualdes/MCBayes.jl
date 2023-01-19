@@ -75,9 +75,7 @@
     #                                        warmup=warmup,
     #                                        iterations=iterations)
 
-    #     draws = draws[warmup+1:end, :, :] # ditch warmup
-    #     draws = draws[1:10:end, :, :] # naively thin remainder
-    #     constrained_draws = constrain_draws(bsm, draws, 0)
+    #     constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
     #     true_means = expectations[model_name][:true_mean]
     #     @test check_means(constrained_draws, true_means)
 

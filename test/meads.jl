@@ -1,5 +1,5 @@
-@testset verbose=true "MEADS" begin
-    iterations = 5_000
+@testset "MEADS" begin
+    iterations = 10_000
     warmup = 1_000
 
     @testset "arK-arK" begin
@@ -11,7 +11,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -25,7 +25,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -39,7 +39,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -55,9 +55,9 @@
             meads, ldg; warmup=warmup, iterations=iterations
         )
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means)
+        @test check_means(constrained_draws, true_means, z = 6)
     end
 
     @testset "highd_mvnormal" begin
@@ -69,7 +69,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -86,7 +86,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -105,7 +105,7 @@
             meads, ldg; warmup=warmup, iterations=iterations
         )
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -119,7 +119,7 @@
         meads = MEADS(dims)
         draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
+        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true, thin = 10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 

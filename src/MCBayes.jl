@@ -135,7 +135,7 @@ function run_sampler!(
 end
 
 # precompile
-function ldg(x)
+function ldg(x; kwargs...)
     -x' * x / 2, -x
 end
 
