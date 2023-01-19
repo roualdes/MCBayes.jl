@@ -112,7 +112,7 @@ function run_sampler!(
     diagnostics = trace(sampler, M + 1)
 
     initialize_sampler!(
-        sampler,
+        sampler;
         stepsize_adapter,
         trajectorylength_adapter,
         metric_adapter,
@@ -126,7 +126,7 @@ function run_sampler!(
     @views initialize_stepsize!(
         stepsize_adapter, sampler, rngs, ldg, draws[1, :, :]; kwargs...
     )
-    set_stepsize!(sampler, stepsize_adapter; kwargs...)
+    set!(sampler, stepsize_adapter; kwargs...)
 
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)

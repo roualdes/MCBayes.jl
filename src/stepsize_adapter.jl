@@ -7,7 +7,7 @@ function optimum(ssa::AbstractStepsizeAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_stepsize!(sampler, ssa::AbstractStepsizeAdapter; smoothed=false, kwargs...)
+function set!(sampler, ssa::AbstractStepsizeAdapter; smoothed=false, kwargs...)
     sampler.stepsize .= smoothed ? optimum(ssa) : ssa.stepsize
 end
 
@@ -95,7 +95,7 @@ function update!(ssc::StepsizeConstant, args...; kwargs...) end
 
 function reset!(ssc::StepsizeConstant, args...; kwargs...) end
 
-function set_stepsize!(sampler, ssc::StepsizeConstant, args...; kwargs...)
+function set!(sampler, ssc::StepsizeConstant, args...; kwargs...)
     sampler.stepsize .= ssc.stepsize
 end
 
@@ -125,6 +125,6 @@ end
 
 function reset!(seca::StepsizeECA; kwargs...) end
 
-function set_stepsize!(sampler, seca::StepsizeECA, idx; kwargs...)
+function set!(sampler, seca::StepsizeECA, idx; kwargs...)
     sampler.stepsize[idx] = seca.stepsize[idx]
 end

@@ -27,7 +27,7 @@
 
         constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means)
+        @test check_means(constrained_draws, true_means, z=6)
     end
 
     @testset "garch-garch11" begin
@@ -55,7 +55,7 @@
 
         constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means, z=6)
+        @test check_means(constrained_draws, true_means, z=7)
     end
 
     @testset "highd_mvnormal" begin

@@ -7,7 +7,7 @@ function optimum(neca::AbstractNoiseAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_noise!(sampler, neca::AbstractNoiseAdapter; smoothed=false, kwargs...)
+function set!(sampler, neca::AbstractNoiseAdapter; smoothed=false, kwargs...)
     sampler.noise .= smoothed ? optimum(neca) : neca.noise
 end
 
@@ -34,7 +34,7 @@ function reset!(neca::NoiseECA; kwargs...)
     neca.noise_bar .= 0
 end
 
-function set_noise!(sampler, neca::NoiseECA, idx; kwargs...)
+function set!(sampler, neca::NoiseECA, idx; kwargs...)
     sampler.noise[idx] = neca.noise[idx]
 end
 
@@ -47,7 +47,7 @@ function NoiseConstant(initial_drift::AbstractVector; kwargs...)
     return NoiseConstant(initial_drift, initial_drift)
 end
 
-function set_noise!(sampler, nc::NoiseConstant, args...; kwargs...) end
+function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
 
 function update!(nc::NoiseConstant, args...; kwargs...) end
 
