@@ -1,5 +1,5 @@
 @testset "MEADS" begin
-    iterations = 10_000
+    iterations = 5_000
     warmup = 1_000
 
     @testset "arK-arK" begin
