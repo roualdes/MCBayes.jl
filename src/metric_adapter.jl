@@ -2,8 +2,12 @@ abstract type AbstractMetricAdapter{T} end
 
 Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
-function set_metric!(sampler, ma::AbstractMetricAdapter; kwargs...)
+function set!(sampler, ma::AbstractMetricAdapter; kwargs...)
     sampler.metric .= optimum(ma; kwargs...)
+end
+
+function optimum(ma::AbstractMetricAdapter; kwargs...)
+    return ma.metric
 end
 
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
@@ -37,14 +41,13 @@ function MetricConstant(initial_metric::AbstractMatrix; kwargs...)
     return MetricConstant(initial_metric)
 end
 
-function update!(mc::MetricConstant, x::AbstractMatrix; kwargs...) end
-
-function optimum(mc::MetricConstant; kwargs...)
-    return mc.metric
-end
+function update!(mc::MetricConstant, args...; kwargs...) end
 
 function reset!(mc::MetricConstant; kwargs...) end
 
+function set!(sampler, mc::MetricConstant, args...; kwargs...)
+    sampler.metric .= mc.metric
+end
 
 struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
@@ -52,4 +55,12 @@ end
 
 function MetricECA(initial_metric::AbstractMatrix; kwargs...)
     return MetricECA(initial_metric)
+end
+
+function update!(meca::MetricECA, sigma, idx; kwargs...)
+    meca.metric[:, idx] .= sigma
+end
+
+function set!(sampler, meca::MetricECA, idx; kwargs...)
+    sampler.metric[:, idx] .= meca.metric[:, idx]
 end

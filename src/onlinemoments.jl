@@ -59,6 +59,7 @@ function reset!(om::OnlineMoments; kwargs...)
     om.v .= 0
 end
 
+# TODO this belongs in metric adapter
 function optimum(om::OnlineMoments; regularized=true, kwargs...)
     T = eltype(om.v)
     if om.n[1] > 1

@@ -24,7 +24,7 @@ function optimum(tla::AbstractTrajectorylengthAdapter)
     return tla.trajectorylength_bar
 end
 
-function set_trajectorylength!(sampler, tla::AbstractTrajectorylengthAdapter; kwargs...)
+function set!(sampler, tla::AbstractTrajectorylengthAdapter; kwargs...)
     if :trajectorylength in fieldnames(typeof(sampler))
         sampler.trajectorylength .= optimum(tla)
     end

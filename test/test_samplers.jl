@@ -13,7 +13,9 @@ function prepare_model(model_name)
     modeldir = joinpath(artifact"test_models", "test_models", model_name)
     stan_file = joinpath(modeldir, model_name * ".stan")
     stan_data = joinpath(modeldir, model_name * ".json")
-    bsm = BS.StanModel(; stan_file=stan_file, data=stan_data)
+    bsm = BS.StanModel(;
+        stan_file=stan_file, data=stan_data, make_args=["STAN_THREADS=true"]
+    )
     return bsm
 end
 
@@ -37,10 +39,10 @@ function prepare_log_density(bridgestan_model)
     end
 end
 
-function constrain_draws(bridgestan_model, draws, warmup; include_tp=false)
+function constrain_draws(bridgestan_model, draws, warmup; include_tp=false, thin=1)
     return mapslices(
         q -> BS.param_constrain(bridgestan_model, q; include_tp=include_tp),
-        draws[(warmup + 1):end, :, :];
+        draws[(warmup + 1):thin:end, :, :];
         dims=2,
     )
 end
@@ -78,9 +80,10 @@ function check_stds(constrained_draws, true_stds; z=5)
 end
 
 modeldir = joinpath(artifact"test_models", "test_models")
-# models and values from stan-dev/posteriordb
+# most models and values from stan-dev/posteriordb
 expectations = open(deserialize, joinpath(modeldir, "expectations.jls"))
 model_names = [f for f in readdir(modeldir) if isdir(joinpath(modeldir, f))]
 
 include("mh.jl")
 include("stan.jl")
+include("meads.jl")

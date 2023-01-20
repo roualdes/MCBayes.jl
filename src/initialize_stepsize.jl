@@ -1,9 +1,9 @@
 # TODO move this into stepsize_adapter
-function initialize_stepsize!(stepsize_adapter, metric, rngs, ldg, positions; kwargs...)
+function initialize_stepsize!(stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
     init_stepsize!(
         stepsize_adapter.initializer,
         stepsize_adapter,
-        metric,
+        sampler,
         rngs,
         ldg,
         positions;
@@ -12,26 +12,30 @@ function initialize_stepsize!(stepsize_adapter, metric, rngs, ldg, positions; kw
 end
 
 function init_stepsize!(
-    method::Symbol, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
+    method::Symbol, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
 )
-    init_stepsize!(Val{method}(), stepsize_adapter, metric, rngs, ldg, positions; kwargs...)
+    init_stepsize!(
+        Val{method}(), stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
+    )
 end
 
 function init_stepsize!(
-    ::Val{:mh}, stepsize_adapter, metric, rngs, ld, positions; kwargs...
+    ::Val{:mh}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...
 )
     dims = size(positions, 1)
     stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
 end
 
 function init_stepsize!(
-    ::Val{:none}, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
+    ::Val{:none}, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
 ) end
 
 function init_stepsize!(
-    ::Val{:stan}, stepsize_adapter, metric, rngs, ldg, positions; kwargs...
+    ::Val{:stan}, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
 )
     stepsize = stepsize_adapter.stepsize
+    metric = sampler.metric
+
     for chain in axes(positions, 2)
         @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             stepsize[chain],
@@ -98,10 +102,19 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     return stepsize
 end
 
-# function initialize_stepsize!(::Val{:adam}, adapter, metric, rng, ldg,
-#                               draws::Array; kwargs...)
-#     # TODO need do anything here?
-# end
+function init_stepsize!(
+    ::Val{:meads}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...
+)
+    for f in 1:(sampler.folds)
+        k = (f + 1) % sampler.folds + 1
+        kfold = sampler.partition[:, k]
+
+        q = positions[:, kfold]
+        sigma = std(q; dims=2)
+
+        update!(stepsize_adapter, ldg, q, sigma, f; kwargs...)
+    end
+end
 
 # # TODO needs a second look
 # function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg, draws; kwargs...)

@@ -14,6 +14,7 @@ struct MEADS{T} <: AbstractMEADS{T}
     folds::Int
     chainsperfold::Int
     chains::Int
+    maxdeltaH::T
 end
 
 function shuffle_folds(num_chains, num_chainsperfold)
@@ -34,8 +35,9 @@ function MEADS(
     chainsperfold=32,
     T=Float64;
     metric=ones(T, dims, folds),
-    stepsize=ones(T, folds),
-    nru=false
+    stepsize=ones(T, folds) / 2,
+    nru=true,
+    maxdeltaH=convert(T, 1000),
 )
     D = convert(Int, dims)::Int
     chains = folds * chainsperfold
@@ -44,7 +46,7 @@ function MEADS(
     partition = shuffle_folds(chains, chainsperfold)
     damping = 1 ./ stepsize
     noise = 1 .- exp.(-2 .* damping .* stepsize)
-    drift = 0.5 .* noise
+    drift = noise ./ 2
     return MEADS(
         metric,
         stepsize,
@@ -58,7 +60,8 @@ function MEADS(
         D,
         folds,
         chainsperfold,
-        chains
+        chains,
+        maxdeltaH,
     )
 end
 
@@ -68,29 +71,29 @@ function sample!(
     draws_initializer=:adam,
     stepsize_adapter=StepsizeECA(sampler.stepsize),
     metric_adapter=MetricECA(sampler.metric),
-    damping_adapter=DampingECA(1 ./ sampler.stepsize),
-    noise_adapter=NoiseECA(1 .- exp.(-2 .* damping_adapter.damping .* stepsize_adapter.stepsize)),
-    drift_adapter=DriftECA(noise_adapter.noise),
+    damping_adapter=DampingECA(sampler.damping),
+    noise_adapter=NoiseECA(sampler.noise),
+    drift_adapter=DriftECA(sampler.drift),
     adaptation_schedule=EnsembleChainSchedule(),
     kwargs...,
 )
-    return run_sampler!(sampler,
-                        ldg;
-                        draws_initializer,
-                        stepsize_adapter,
-                        metric_adapter,
-                        damping_adapter,
-                        noise_adapter,
-                        drift_adapter,
-                        adaptation_schedule,
-                        kwargs...
+    return run_sampler!(
+        sampler,
+        ldg;
+        draws_initializer,
+        stepsize_adapter,
+        metric_adapter,
+        damping_adapter,
+        noise_adapter,
+        drift_adapter,
+        adaptation_schedule,
+        kwargs...,
     )
 end
 
 function transition!(sampler::MEADS, m, ldg, draws, rngs, trace; kwargs...)
-    chains = size(draws, 3)
     if m % sampler.folds == 0
-        sampler.partition .= shuffle_folds(chains, sampler.chainsperfold)
+        sampler.partition .= shuffle_folds(sampler.chains, sampler.chainsperfold)
     end
 
     skipfold = m % sampler.folds + 1
@@ -117,11 +120,16 @@ function transition!(sampler::MEADS, m, ldg, draws, rngs, trace; kwargs...)
                         sampler.noise[f],
                         sampler.drift[f],
                         sampler.nru,
+                        sampler.maxdeltaH;
                         kwargs...,
                     )
-                    record!(trace, info, m + 1, chain)
+                    # TODO at least consider doing "adaptation" in here for speed,
+                    # since technically this algorithm doesn't "adapt"
+
+                    # TODO not properly recording diagnostics
+                    #record!(trace, info, m + 1, chain)
                 else
-                    draws[m + 1, :, chain] .= draws[m, :, chain]
+                    draws[m + 1, :, chain] = draws[m, :, chain]
                 end
             end
         end

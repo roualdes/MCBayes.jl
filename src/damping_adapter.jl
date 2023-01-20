@@ -7,7 +7,7 @@ function optimum(deca::AbstractDampingAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_damping!(sampler, deca::AbstractDampingAdapter; smoothed=false, kwargs...)
+function set!(sampler, deca::AbstractDampingAdapter; smoothed=false, kwargs...)
     sampler.damping .= smoothed ? optimum(deca) : deca.damping
 end
 
@@ -21,7 +21,7 @@ function DampingECA(initial_damping::AbstractVector{T}; kwargs...) where {T}
 end
 
 function update!(deca::DampingECA, m, zpositions, stepsize, idx; kwargs...)
-    deca.damping[idx] = max(1 / m, stepsize[idx], sqrt(max_eigenvalue(zpositions)))
+    deca.damping[idx] = max(1 / m, stepsize[idx] / sqrt(max_eigenvalue(zpositions)))
     deca.damping_bar[idx] = deca.damping[idx]
 end
 
@@ -29,7 +29,7 @@ function reset!(deca::DampingECA; kwargs...)
     deca.damping_bar .= 0
 end
 
-function set_damping!(sampler, deca::DampingECA, idx; kwargs...)
+function set!(sampler, deca::DampingECA, idx; kwargs...)
     sampler.damping[idx] = deca.damping[idx]
 end
 

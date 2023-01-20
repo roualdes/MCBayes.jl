@@ -43,33 +43,36 @@ function pghmc!(
     acceptance_probability,
     noise,
     drift,
-    nonreversible_update;
+    nonreversible_update,
+    maxdeltaH;
     kwargs...,
 )
     T = eltype(position)
-    position_next .= position
-    momentum_next = copy(momentum)
+    q = copy(position)
+    p = copy(momentum)
 
-    ld, gradient = ldg(position_next; kwargs...)
-    H0 = hamiltonian(ld, momentum_next)
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
     isnan(H0) && (H0 = typemax(T))
 
-    ld, gradient = leapfrog!(position_next, momentum_next, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...)
+    ld, gradient = leapfrog!(q, p, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...)
 
-    H = hamiltonian(ld, momentum_next)
+    H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
-    divergent = (H -  H0)
+    divergent = (H - H0) > maxdeltaH
 
     a = H0 - H
     accepted = log(abs(acceptance_probability[])) < a
     if accepted
-        position_next .= position
-        momentum_next .= momentum
+        position_next .= q
+        momentum .= p
         acceptance_probability[] *= exp(-a)
     else
-        momentum_next .*= -1
+        position_next .= position
+        momentum .*= -1
     end
-    momentum_next .= sqrt.(1 .- noise .^ 2) .* momentum_next .+ noise .* randn(rng, T, dims)
+    energy = hamiltonian(ld, momentum)
+    momentum .= sqrt.(1 .- noise .^ 2) .* momentum .+ noise .* randn(rng, T, dims)
 
     acceptance_probability[] = if nonreversible_update
         (acceptance_probability[] + 1 + drift) % 2 - 1
@@ -77,12 +80,7 @@ function pghmc!(
         rand(rng, T)
     end
 
-    return (;
-            accepted,
-            divergent,
-            energy=hamiltonian(ld, momentum_next),
-            acceptstat=a > zero(a) ? one(a) : exp(a),
-    )
+    return (; accepted, divergent, energy, acceptstat=a > zero(a) ? one(a) : exp(a))
 end
 
 function rand_momentum(rng, dims, metric)
@@ -130,17 +128,16 @@ function logsumexp(v::AbstractVector)
 end
 
 function max_eigenvalue(x)
-    N = size(x, 1)
-    trace_est = sum(z -> z ^ 2, x)
-    trace_sq_est = sum(z -> z ^ 2, x * x') / N
+    N = size(x, 2)
+    trace_est = sum(z -> z^2, x)
+    trace_sq_est = sum(z -> z^2, x' * x) / N
     return trace_sq_est / trace_est
 end
 
-function standardize_draws(positions, kfold)
-    z = positions[:, kfold]
-    scale = std(z, dims = 2)
-    z ./= scale
-    location = mean(z, dims = 2)
+function standardize_draws(x)
+    scale = std(x; dims=2)
+    z = x ./ scale
+    location = mean(z; dims=2)
     z .-= location
     return z, scale
 end

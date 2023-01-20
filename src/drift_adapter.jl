@@ -7,7 +7,7 @@ function optimum(deca::AbstractDriftAdapter; kwargs...)
 end
 
 # TODO(ear) move smoothed into optimum(; kwargs...)
-function set_drift!(sampler, deca::AbstractDriftAdapter; smoothed=false, kwargs...)
+function set!(sampler, deca::AbstractDriftAdapter; smoothed=false, kwargs...)
     sampler.drift .= smoothed ? optimum(deca) : deca.drift
 end
 
@@ -26,7 +26,7 @@ function update!(deca::DriftECA, noise; kwargs...)
 end
 
 function update!(deca::DriftECA, noise, idx; kwargs...)
-    deca.drift[idx] = noise[idx] ^ 2 / 2
+    deca.drift[idx] = noise[idx]^2 / 2
     deca.drift_bar[idx] = deca.drift[idx]
 end
 
@@ -34,7 +34,7 @@ function reset!(deca::DriftECA; kwargs...)
     deca.drift_bar .= 0
 end
 
-function set_drift!(sampler, deca::DriftECA, idx; kwargs...)
+function set!(sampler, deca::DriftECA, idx; kwargs...)
     sampler.drift[idx] = deca.drift[idx]
 end
 
