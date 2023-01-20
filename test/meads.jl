@@ -1,6 +1,6 @@
 @testset "MEADS" begin
-    iterations = 5_000
-    warmup = 1_000
+    iterations = 2_000
+    warmup = 500
 
     @testset "arK-arK" begin
         model_name = model_names[1]

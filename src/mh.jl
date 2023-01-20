@@ -39,18 +39,22 @@ function sample!(
 end
 
 function transition!(sampler::MH, m, ld, draws, rngs, trace; kwargs...)
-    for chain in axes(draws, 3) # TODO multi-thread-able
-        @views info = mh_kernel!(
-            draws[m, :, chain],
-            draws[m + 1, :, chain],
-            rngs[chain],
-            sampler.dims,
-            sampler.metric[:, chain],
-            sampler.stepsize[chain],
-            ld;
-            kwargs...,
-        )
-        record!(trace, info, m + 1, chain)
+    nt = get(kwargs, :threads, Threads.nthreads())
+    chains = size(draws, 3)
+    @sync for it in 1:nt
+        Threads.@spawn for chain in it:nt:chains
+            @views info = mh_kernel!(
+                draws[m, :, chain],
+                draws[m + 1, :, chain],
+                rngs[chain],
+                sampler.dims,
+                sampler.metric[:, chain],
+                sampler.stepsize[chain],
+                ld;
+                kwargs...,
+            )
+            record!(trace, info, m + 1, chain)
+        end
     end
 end
 

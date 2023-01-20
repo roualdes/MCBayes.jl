@@ -45,4 +45,4 @@ jobs:
         run: julia --project=./test -e 'using Pkg; Pkg.develop(PackageSpec(path="bridgestan", subdir="julia")); Pkg.instantiate();'
 
       - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+        run: julia --threads=2 --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'

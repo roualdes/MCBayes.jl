@@ -1,7 +1,7 @@
 .PHONY: test pretty doc
 
 test:
-	julia -e 'using Pkg; Pkg.activate("."); Pkg.test();'
+	julia --threads=2 -e 'using Pkg; Pkg.activate("."); Pkg.test();'
 
 pretty:
 	julia -e 'using JuliaFormatter; format(".", verbose = true);'

@@ -55,20 +55,24 @@ function sample!(
 end
 
 function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
-    for chain in axes(draws, 3) # TODO multi-thread-able
-        @views info = stan_kernel!(
-            draws[m, :, chain],
-            draws[m + 1, :, chain],
-            rngs[chain],
-            sampler.dims,
-            sampler.metric[:, chain],
-            sampler.stepsize[chain],
-            sampler.maxdeltaH,
-            sampler.maxtreedepth,
-            ldg;
-            kwargs...,
-        )
-        record!(trace, info, m + 1, chain)
+    nt = get(kwargs, :threads, Threads.nthreads())
+    chains = size(draws, 3)
+    @sync for it in 1:nt
+        Threads.@spawn for chain in it:nt:chains
+            @views info = stan_kernel!(
+                draws[m, :, chain],
+                draws[m + 1, :, chain],
+                rngs[chain],
+                sampler.dims,
+                sampler.metric[:, chain],
+                sampler.stepsize[chain],
+                sampler.maxdeltaH,
+                sampler.maxtreedepth,
+                ldg;
+                kwargs...,
+            )
+            record!(trace, info, m + 1, chain)
+        end
     end
 end
 
