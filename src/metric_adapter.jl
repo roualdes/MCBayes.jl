@@ -21,7 +21,7 @@ function MetricOnlineMoments(initial_metric::AbstractMatrix{T}; kwargs...) where
     return MetricOnlineMoments(om, initial_metric)
 end
 
-function update!(mom::MetricOnlineMoments, x::AbstractMatrix; kwargs...)
+function update!(mom::MetricOnlineMoments, x::AbstractMatrix, args...; kwargs...)
     update!(mom.om, x; kwargs...)
 end
 
