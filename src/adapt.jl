@@ -28,11 +28,7 @@ function adapt!(
         set!(sampler, trajectorylength_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
-            grads = similar(sampler.metric)
-            for c in axes(grads, 2)
-                _, grads[:, c] = ldg(draws[m + 1, :, c]; kwargs...)
-            end
-            @views update!(metric_adapter, draws[m + 1, :, :], grads; kwargs...)
+            @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
 
         if m == schedule.closewindow

@@ -78,9 +78,13 @@ function MetricFisherDivergence(initial_metric::AbstractMatrix{T}; kwargs...) wh
     return MetricFisherDivergence(om, og, initial_metric)
 end
 
-function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, g::AbstractMatrix; kwargs...)
+function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg; kwargs...)
+    grads = similar(mfd.metric)
+    for c in axes(grads, 2)
+        _, grads[:, c] = ldg(x[:, c]; kwargs...)
+    end
     update!(mfd.om, x; kwargs...)
-    update!(mfd.og, g; kwargs...)
+    update!(mfd.og, grads; kwargs...)
 end
 
 function optimum(mfd::MetricFisherDivergence; kwargs...)
