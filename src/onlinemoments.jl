@@ -58,19 +58,3 @@ function reset!(om::OnlineMoments; kwargs...)
     om.m .= 0
     om.v .= 0
 end
-
-# TODO this belongs in metric adapter
-function optimum(om::OnlineMoments; regularized=true, kwargs...)
-    T = eltype(om.v)
-    if om.n[1] > 1
-        v = if regularized
-            w = reshape(convert.(T, om.n ./ (om.n .+ 5)), 1, :)
-            @. w * om.v + (1 - w) * convert(T, 1e-3)
-        else
-            om.v
-        end
-        return v
-    else
-        return ones(T, size(om.v))
-    end
-end
