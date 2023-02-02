@@ -2,13 +2,12 @@ abstract type AbstractDampingAdapter{T} end
 
 Base.eltype(::AbstractDampingAdapter{T}) where {T} = T
 
-function optimum(deca::AbstractDampingAdapter; kwargs...)
-    return deca.damping_bar
+function optimum(da::AbstractDampingAdapter, args...; smoothed=false, kwargs...)
+    return smoothed ? da.damping_bar : da.damping
 end
 
-# TODO(ear) move smoothed into optimum(; kwargs...)
-function set!(sampler, deca::AbstractDampingAdapter; smoothed=false, kwargs...)
-    sampler.damping .= smoothed ? optimum(deca) : deca.damping
+function set!(sampler, da::AbstractDampingAdapter, args...; kwargs...)
+    sampler.damping .= optimum(da)
 end
 
 struct DampingECA{T<:AbstractFloat} <: AbstractDampingAdapter{T}
@@ -20,16 +19,17 @@ function DampingECA(initial_damping::AbstractVector{T}; kwargs...) where {T}
     return DampingECA(initial_damping, zero(initial_damping))
 end
 
-function update!(deca::DampingECA, m, zpositions, stepsize, idx; kwargs...)
+function update!(deca::DampingECA, m, zpositions, stepsize, idx, args...; kwargs...)
     deca.damping[idx] = max(1 / m, stepsize[idx] / sqrt(max_eigenvalue(zpositions)))
     deca.damping_bar[idx] = deca.damping[idx]
 end
 
-function reset!(deca::DampingECA; kwargs...)
+function reset!(deca::DampingECA, args...; kwargs...)
+    deca.damping .= 0
     deca.damping_bar .= 0
 end
 
-function set!(sampler, deca::DampingECA, idx; kwargs...)
+function set!(sampler, deca::DampingECA, idx, args...; kwargs...)
     sampler.damping[idx] = deca.damping[idx]
 end
 
@@ -42,6 +42,6 @@ function DampingConstant(initial_drift::AbstractVector; kwargs...)
     return DampingConstant(initial_drift, initial_drift)
 end
 
-function update!(dc::DampingConstant, m, zpositions, stepsize, idx; kwargs...) end
+function update!(dc::DampingConstant, args...; kwargs...) end
 
-function reset!(dc::DampingConstant; kwargs...) end
+function reset!(dc::DampingConstant, args...; kwargs...) end
