@@ -28,7 +28,7 @@ function adapt!(
         set!(sampler, trajectorylength_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
-            @views update!(metric_adapter, draws[m + 1, :, :]; kwargs...)
+            @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
 
         if m == schedule.closewindow
