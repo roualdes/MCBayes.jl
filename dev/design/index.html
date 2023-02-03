@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Design · MCBayes.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link rel="canonical" href="https://roualdes.github.io/MCBayes.jl/design/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MCBayes.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Design</a><ul class="internal"><li><a class="tocitem" href="#User-Interface"><span>User Interface</span></a></li><li><a class="tocitem" href="#Internal-API"><span>Internal API</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Design</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Design</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/roualdes/MCBayes.jl/blob/main/docs/src/design.md#" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Design"><a class="docs-heading-anchor" href="#Design">Design</a><a id="Design-1"></a><a class="docs-heading-anchor-permalink" href="#Design" title="Permalink"></a></h1><h2 id="User-Interface"><a class="docs-heading-anchor" href="#User-Interface">User Interface</a><a id="User-Interface-1"></a><a class="docs-heading-anchor-permalink" href="#User-Interface" title="Permalink"></a></h2><p>From a user&#39;s perspective, Bayesian inference requires a log joint density function <code>ldg</code>, which may or may not depend on some data. <code>MCBayes</code> further requires the dimension of the input to the log density gradient.  Consider the log joint density function of the Gaussian distribution&#39;s density function.</p><pre><code class="language-julia hljs">function ldg(q; kwargs...)
+    return -q&#39; * q / 2, -q
+end
+dims = 10
+q = randn(dims)
+ldg(q)</code></pre><p>The function <code>ldg</code> takes in a vector of length <code>dims</code>, and any number of keyword arguments, and returns a 2-tuple consisting of a scalar and a vector of the same length as the input.  The returned scalar is the evaluation of <code>ldg</code> at the input <code>q</code>.  The returned vector is the gradient of <code>ldg</code> evaluated at <code>q</code>.</p><p>To obtain samples from the distribution corresponding to the log joint density function above, using the <code>MCBayes</code> implementation of <a href="https://mc-stan.org">Stan</a>&#39;s dynamic Hamiltonian Monte Carlo algorithm, instantiate a Stan sampler object and pass it to the <code>MCBayes</code> function <code>sample!(...)</code>.</p><pre><code class="language-julia hljs">stan = Stan(dims)
+draws, diagnostics, rngs = sample!(stan, ldg)</code></pre><p>The output of <code>sample!(...)</code> is a 3-tuple.  The first element is a 3-dimensional array of draws (iterations x dimension x chains) from the distribution corresponding to the log joint density function <code>ldg</code>.  The second element is a tuple of diagnostics, which are meant to help the user evaluate the success (or lack thereof) of the sampling algorithm.  The third element is the random number generator seeds at the point that the sampling algorithm terminated.</p><p>The sampler object could be <code>MEADS(dims)</code>, for an implentation of <a href="https://proceedings.mlr.press/v151/hoffman22a.html">Tuning-Free Generalized Hamiltonian Monte Carlo</a>, or <code>MH(dims)</code> for an implementation of the Metropolis algorithm which adaptatively tunes the metric for the proposal distribution and the stepsize.</p><h2 id="Internal-API"><a class="docs-heading-anchor" href="#Internal-API">Internal API</a><a id="Internal-API-1"></a><a class="docs-heading-anchor-permalink" href="#Internal-API" title="Permalink"></a></h2><p>Almost the entire structure of all sampling algorithms of <code>MCBayes</code> fit into this one function.  For now, focus on only the arguments <code>sampler</code> and <code>ldg</code>, and the verbs/functions.  Try to ignore the adapters for just a moment.</p><pre><code class="language-julia hljs">function run_sampler!(sampler::AbstractSampler, ldg;
+                      iterations = 1000,
+                      warmup = iterations,
+                      stepsize_adapter = StepsizeConstant(...),
+                      metric_adapter = MetricConstant(...),
+                      trajectorylength_adapter = TrajectorlengthConstant(...),
+                      damping_adapter = DampingConstant(...),
+                      noise_adapter = NoiseConstant(...),
+                      drift_adapter = DriftConstant(...),
+                      adaptation_schedule = WindowedAdaptationSchedule(warmup),
+                      ...
+                      )
+    M = iterations + warmup
+    draws = preallocate_draws(M, ...)
+    diagnostics = preallocate_diagnostics(...)
+
+    initialize_sampler!(sampler, ...)
+    initialize_draws!(draws, ldg, ...)
+    initialize_stepsize!(sampler, ldg, draws, ...)
+
+    for m in 1:M
+        transition!(sampler, m, ldg, draws, ...)
+        adapt!(sampler, adaptation_schedule, m, ldg, draws,
+               stepsize_adapter,
+               metric_adapter,
+               trajectorylength_adapter,
+               damping_adapter,
+               noise_adapter,
+               drift_adapter,
+               ...
+               )
+    end
+
+    return draws, diagnostics, rngs
+end</code></pre><p><code>MCBayes</code> makes heavy use of the multiple dispatch capabilities of Julia.  So each sampler gets its own <code>transition!(...)</code> function.  All samplers, so far, share the one <code>adapt!(...)</code> method, since the internals of <code>adapt!(...)</code> dispatch on appropriate adatpers.</p><p>You may have noticed that the <a href="#User-Interface">User Interface</a> example calls <code>sample!(...)</code>, not <code>run_sampler!(...)</code>.  In fact, each sampler object, e.g. Stan, MEADS, MH, gets its own <code>sample!(...)</code> function which specifies the adaptation components appropriate to that sampler and then immediately calls <code>run_sampler!(...)</code>.</p><p>For instance, a default run of Stan uses Dual Averaging to adapt the stepsize during the warmup iterations.  So the function <code>sample!(...)</code> appropriate to Stan has signature something like</p><pre><code class="language-julia hljs">function sample!(sampler::Stan, ldg;
+                 iterations = 1000,
+                 warmup = iterations,
+                 stepsize_adapter = StepsizeDualAverage(sampler.stepsize),
+                 metric_adapter = MetricOnlineMoments(sampler.metric),
+                 adaptation_schedule = WindowedAdaptationSchedule(warmup),
+                 ...)
+    return run_sampler!(sampler,
+                        ldg;
+                        iterations,
+                        warmup,
+                        stepsize_adapter,
+                        metric_adapter,
+                        adaptation_schedule,
+                        kwargs...)
+end</code></pre><p>The function <code>sample!(sampler::Stan, ...)</code>  passes the adaptation components specific to Stan to <code>run_sampler!(...)</code>, thus over-riding the adapters <code>run_sampler!(...)</code> otherwise defaults to.  Now is a good time to go look back at the default adapters of <code>run_sampler!(...)</code>.</p><p>All <code>*Constant(...)</code> adapters are effectively a no-op within <code>adapt!(...)</code>.  The constant adapters are thus ignored when not appropriate for a particular sampler.</p><p>Consider the adapter <code>TrajectorylengthConstant(...)</code>.  This has zero effect on the Stan sampler, since Stan&#39;s trajectory length is dynamically determined from a modern implementation of <a href="https://arxiv.org/abs/1111.4246">NUTS</a> (see <a href="https://betanalpha.github.io/">Michael Betancourt</a>&#39;s <a href="https://arxiv.org/abs/1701.02434">A Conceptual Introduction to Hamiltonian Monte Carlo</a>).  The dynamic trajectory length is computed within <code>transition!(sampler::Stan, ...)</code>, namely the <code>transition!(...)</code> function appropriate to the Stan sampler.</p><p>The method <code>adapt!(...)</code> itself dispatches to particular <code>adapt!(...)</code> functions, dependent on the <code>adaptation_schedule</code>.  Right now, only Stan&#39;s <a href="https://mc-stan.org/docs/reference-manual/hmc-algorithm-parameters.html#automatic-parameter-tuning">windowed adaptation schedule</a> is implemented.  The structure of <code>adapt!(sampler, schedule::WindowedAdaptationSchedule, ...)</code> looks something like</p><pre><code class="language-julia hljs">function adapt!(sampler, schedule::WindowedAdaptationSchedule,
+                m, ldg, draws,
+                stepsize_adapter,
+                metric_adapter,
+                trajectorylength_adapter,
+                damping_adapter,
+                noise_adapter,
+                drift_adapter,
+                ...)
+    # within warmup
+    if m &lt;= sampler.warmup
+        # update and set stepsize
+        update!(stepsize_adapter, ...)
+        set!(sampler, stepsize_adapter, ...)
+
+        # update and set trajectory length
+        update!(trajectorylength_adapter; kwargs...)
+        set!(sampler, trajectorylength_adapter, ...)
+
+        # in appropriate windows, update (without setting) metric
+        if schedule.firstwindow &lt;= m &lt;= schedule.lastwindow
+            update!(metric_adapter, ...)
+        end
+
+        # at end of window
+        if m == schedule.closewindow
+            # re-initialize, set, and then reset stepsize
+            initialize_stepsize!(stepsize_adapter, ...)
+            set!(sampler, stepsize_adapter, ...)
+            reset!(stepsize_adapter, ...)
+
+            # set and then reset metric
+            set!(sampler, metric_adapter, ...)
+            reset!(metric_adapter)
+
+            calculate_nextwindow!(schedule)
+        end
+    else
+        set!(sampler, stepsize_adapter, ...)
+    end
+end</code></pre><p>When a Stan sampler is passed into the <code>adapt!(...)</code> function above, the adapter within the variable <code>trajectorylength_adapter</code> has type <code>TrajectorylengthConstant</code>.  The method <code>update!(...)</code> dispatches to the function appropriate to this type and results in a no-op.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Friday 3 February 2023 00:13">Friday 3 February 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
