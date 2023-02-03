@@ -2,9 +2,12 @@
 CurrentModule = MCBayes
 ```
 
-# MCBayes
+# MCBayes.jl
 
-Documentation for [MCBayes](https://github.com/roualdes/MCBayes.jl).
+[MCBayes.jl](https://github.com/roualdes/MCBayes.jl) is Julia package
+for Bayesian inference, which only depends on Julia standard library
+packages.
+
 
 ```@index
 ```

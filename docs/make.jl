@@ -14,7 +14,8 @@ makedocs(;
         edit_link="main",
         assets=String[],
     ),
-    pages=["Home" => "index.md"],
+         pages=["Home" => "index.md",
+                "Design" => "design.md"],
 )
 
 deploydocs(; repo="github.com/roualdes/MCBayes.jl", devbranch="main")
