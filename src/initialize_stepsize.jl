@@ -1,4 +1,3 @@
-# TODO move this into stepsize_adapter
 function initialize_stepsize!(stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
     init_stepsize!(
         stepsize_adapter.initializer,

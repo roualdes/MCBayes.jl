@@ -95,7 +95,12 @@ function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...; k
 end
 
 function optimum(mfd::MetricFisherDivergence, args...; kwargs...)
-    return sqrt.(optimum(mfd.om) ./ mfd.og.v)
+    if mfd.om.n[1] > 1
+        return sqrt.(mfd.om.v ./ mfd.og.v)
+    else
+        T = eltype(mfd.om.m)
+        return ones(T, size(mfd.om.v))
+    end
 end
 
 function reset!(mfd::MetricFisherDivergence, args...; kwargs...)

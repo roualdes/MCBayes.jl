@@ -30,6 +30,7 @@ include("initialize_stepsize.jl")
 include("stan.jl")
 include("mh.jl")
 include("meads.jl")
+include("mala.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -41,10 +42,12 @@ include("convergence.jl")
 export Stan,
     MH,
     MEADS,
+    MALA,
     OnlineMoments,
     MetricOnlineMoments,
     MetricConstant,
     MetricECA,
+    MetricFisherDivergence,
     StepsizeAdam,
     StepsizeDualAverage,
     StepsizeConstant,
@@ -58,13 +61,13 @@ export Stan,
     NoiseECA,
     NoiseConstant,
     sample!,
-    # ess_bulk, # wait until https://github.com/JuliaLang/julia/pull/47040
+    # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
     ess_quantile,
     ess_mean,
     ess_sq,
     ess_std,
-    # rhat,  # wait until https://github.com/JuliaLang/julia/pull/47040
+    # rhat,  # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     rhat_basic,
     mcse_mean,
     mcse_std
@@ -156,12 +159,15 @@ function ldg(x; kwargs...)
     -x' * x / 2, -x
 end
 
-stan = Stan(10, 4)
+stan = Stan(10)
 draws, diagnostics, rngs = sample!(stan, ldg)
 ess_mean(draws)
 rhat_basic(draws)
 
 meads = MEADS(10)
 draws, diagnostics, rngs = sample!(meads, ldg)
+
+mala = MALA(10)
+draws, diagnostics, rngs = sample!(mala, ldg)
 
 end
