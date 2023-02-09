@@ -126,3 +126,47 @@ function adapt!(
         end
     end
 end
+
+struct SGAAdaptationSchedule end
+
+function adapt!(
+    sampler,
+    schedule::EnsembleChainSchedule,
+    trace,
+    m,
+    ldg,
+    draws,
+    rngs,
+    metric_adapter,
+    stepsize_initializer,
+    stepsize_adapter,
+    trajectorylength_adapter,
+    damping_adapter,
+    noise_adapter,
+    drift_adapter;
+    trajectorylength_delay = 1000,
+    kwargs...,
+    )
+    warmup = schedule.warmup
+    if m <= warmup
+
+        accept_stats = trace.acceptstat[m, :]
+        update!(stepsize_adapter, accept_stats; warmup, kwargs...)
+        set!(sampler, stepsize_adapter; kwargs...)
+
+        if m > trajectorylength_delay
+            # update!(sampler, trajectorylength_adapter, ...)
+            # set!(sampler, trajectorylength_adapter, ...)
+        end
+
+        @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+        set!(sampler, metric_adapter; kwargs...)
+
+        # update!(pca_adapter, ...)
+        # set!(pca_adapter, ...)
+
+    else
+        set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
+        # set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
+    end
+end

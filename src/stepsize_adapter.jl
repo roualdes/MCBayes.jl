@@ -88,9 +88,10 @@ function update!(ssc::StepsizeConstant, args...; kwargs...) end
 
 function reset!(ssc::StepsizeConstant, args...; kwargs...) end
 
-function set!(sampler, ssc::StepsizeConstant, args...; kwargs...)
-    sampler.stepsize .= ssc.stepsize
-end
+# TODO not convinced this is necessary
+# function set!(sampler, ssc::StepsizeConstant, args...; kwargs...)
+#     sampler.stepsize .= ssc.stepsize
+# end
 
 struct StepsizeECA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     stepsize::Vector{T}

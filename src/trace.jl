@@ -62,3 +62,15 @@ function trace(sampler::MALA{T}, iterations) where {T}
         energy=zeros(T, iterations, chains),
     )
 end
+
+function trace(sampler::AbstractSGA{T}, iterations) where {T}
+    chains = sampler.chains
+    return (;
+            acceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            stepsize=zeros(T, iterations, 1),
+            trajectorylength=zeros(T, iterations, 1),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            )
+end
