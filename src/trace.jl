@@ -1,3 +1,4 @@
+# TODO sampler specific records is the only way forward here
 function record!(trace::NamedTuple, info, iteration, chain)
     keys = (
         :accepted,
@@ -65,10 +66,12 @@ end
 
 function trace(sampler::AbstractSGA{T}, iterations) where {T}
     chains = sampler.chains
+    dims = sampler.dims
     return (;
             acceptstat=zeros(T, iterations, chains),
             accepted=zeros(Bool, iterations, chains),
             stepsize=zeros(T, iterations, 1),
+            position=zeros(T, dims, chains),
             trajectorylength=zeros(T, iterations, 1),
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),

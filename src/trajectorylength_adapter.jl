@@ -26,7 +26,7 @@ function TrajectorylengthChEES(
 end
 
 function update!(tlc::TrajectorylengthChEES, m, αs, draws, stepsize, args...; γ=-0.6, kwargs...)
-   ghats = trajectorylength_gradient(m, )
+   ghats = trajectorylength_gradient(m, αs, draws)
 end
 
 
