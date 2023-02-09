@@ -1,10 +1,24 @@
-# TODO incorporate metric, in the rare case that a user knows a good metric and wants
-# to initialize_draws with that information
-function initialize_draws!(method::Symbol, draws, rngs, ldg; kwargs...)
-    return initialize_draws!(Val{method}(), draws, rngs, ldg; kwargs...)
+struct DrawsInitializer end
+
+function initialize_draws!(initializer::DrawsInitializer, draws, rngs, ldg; kwargs...)
+    if haskey(kwargs, :initial_draw)
+        draws[1, :, :] .= initial_draw
+    else
+        _, dims, chains = size(draws)
+        error(
+            "With DrawsInitializer, " *
+            "supply initial_draw as keyword argument " *
+            "with dimensions (dims=$dims, chains=$chains); " *
+            "initial_draw = randn(dims, chains).",
+        )
+    end
 end
 
-function initialize_draws!(::Val{:mh}, draws, rngs, ld; radius=2, kwargs...)
+struct DrawsInitializerRWM end
+
+function initialize_draws!(
+    initializer::DrawsInitializerRWM, draws, rngs, ld; radius=2, kwargs...
+)
     T = eltype(draws)
     _, dims, chains = size(draws)
     for chain in 1:chains
@@ -12,7 +26,9 @@ function initialize_draws!(::Val{:mh}, draws, rngs, ld; radius=2, kwargs...)
     end
 end
 
-function initialize_draws!(::Val{:stan}, draws, rngs, ldg; kwargs...)
+struct DrawsInitializerStan end
+
+function initialize_draws!(initializer::DrawsInitializerStan, draws, rngs, ldg; kwargs...)
     for chain in axes(draws, 3)
         @views draws[1, :, chain] = stan_initialize_draw(
             draws[1, :, chain], ldg, rngs[chain]; kwargs...
@@ -49,8 +65,10 @@ function stan_initialize_draw(position, ldg, rng; radius=2, attempts=100, kwargs
     return q
 end
 
+struct DrawsInitializerAdam end
+
 function initialize_draws!(
-    ::Val{:adam},
+    initializer::DrawsInitializerAdam,
     draws,
     rngs,
     ldg;
@@ -73,19 +91,5 @@ function initialize_draws!(
             end
             draws[1, :, chain] .+= randn(rngs[chain], T, dims) .* 0.1
         end
-    end
-end
-
-function initialize_draws!(
-    ::Val{:none}, draws::AbstractArray, gradients, rng, ldg; kwargs...
-)
-    if haskey(kwargs, :initial_draw)
-        draws[1, :, :] .= initial_draw
-    else
-        _, dims, chains = size(draws)
-        error(
-            "With draws_initializer = :none, " *
-            "supply initial_draw with dimensions $dims by $chains",
-        )
     end
 end

@@ -32,11 +32,11 @@
     @test isequal(eltype(meads.metric), T)
     @test isequal(eltype(meads.stepsize), T)
 
-    mh = MH(dims, chains, T)
-    draws, diagnostics, rngs = sample!(mh, ld; iterations)
+    rwm = RWM(dims, chains, T)
+    draws, diagnostics, rngs = sample!(rwm, ld; iterations)
     @test isequal(eltype(draws), T)
-    @test isequal(eltype(mh.metric), T)
-    @test isequal(eltype(mh.stepsize), T)
+    @test isequal(eltype(rwm.metric), T)
+    @test isequal(eltype(rwm.stepsize), T)
 
     mala = MALA(dims, chains, T)
     draws, diagnostics, rngs = sample!(mala, ldg; iterations)

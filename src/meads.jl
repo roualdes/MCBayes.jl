@@ -68,7 +68,8 @@ end
 function sample!(
     sampler::MEADS,
     ldg;
-    draws_initializer=:adam,
+    draws_initializer=DrawsInitializerAdam(),
+    stepsize_initializer=StepsizeInitializerMEADS(),
     stepsize_adapter=StepsizeECA(sampler.stepsize),
     metric_adapter=MetricECA(sampler.metric),
     damping_adapter=DampingECA(sampler.damping),
@@ -81,6 +82,7 @@ function sample!(
         sampler,
         ldg;
         draws_initializer,
+        stepsize_initializer,
         stepsize_adapter,
         metric_adapter,
         damping_adapter,

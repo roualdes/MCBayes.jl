@@ -31,7 +31,7 @@ function trace(sampler::Stan{T}, iterations) where {T}
     )
 end
 
-function trace(sampler::MH{T}, iterations) where {T}
+function trace(sampler::RWM{T}, iterations) where {T}
     chains = sampler.chains
     return (;
         acceptstat=zeros(T, iterations, chains),
@@ -52,14 +52,13 @@ function trace(sampler::MEADS{T}, iterations) where {T}
     )
 end
 
-
 function trace(sampler::MALA{T}, iterations) where {T}
     chains = sampler.chains
     return (;
-            acceptstat=zeros(T, iterations, chains),
-            accepted=zeros(Bool, iterations, chains),
-            stepsize=zeros(T, iterations, chains),
-            divergence=zeros(Bool, iterations, chains),
-            energy=zeros(T, iterations, chains),
-            )
+        acceptstat=zeros(T, iterations, chains),
+        accepted=zeros(Bool, iterations, chains),
+        stepsize=zeros(T, iterations, chains),
+        divergence=zeros(Bool, iterations, chains),
+        energy=zeros(T, iterations, chains),
+    )
 end

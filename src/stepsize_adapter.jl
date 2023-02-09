@@ -14,15 +14,12 @@ struct StepsizeAdam{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     adam::Adam{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
-    initializer::Symbol
 end
 
-function StepsizeAdam(
-    initial_stepsize::AbstractVector{T}; initializer=:sga, kwargs...
-) where {T}
+function StepsizeAdam(initial_stepsize::AbstractVector{T}; kwargs...) where {T}
     chains = length(initial_stepsize)
     adam = Adam(chains, T; kwargs...)
-    return StepsizeAdam(adam, initial_stepsize, zero(initial_stepsize), initializer)
+    return StepsizeAdam(adam, initial_stepsize, zero(initial_stepsize))
 end
 
 """
@@ -45,7 +42,6 @@ struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     da::DualAverage{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
-    initializer::Symbol
 end
 
 """
@@ -54,11 +50,11 @@ end
 Construct a stepsize adapter using the dual averaging method by [Nesterov 2009](https://link.springer.com/article/10.1007/s10107-007-0149-x), as used in [Stan](https://mc-stan.org/docs/reference-manual/hmc-algorithm-parameters.html#ref-Nesterov:2009).  The length of `initial_stepsize::Vector` must be appropriate for the sampling algorithm for which this stepsize adapter will be used.
 """
 function StepsizeDualAverage(
-    initial_stepsize::AbstractVector{T}; initializer=:stan, kwargs...
+    initial_stepsize::AbstractVector{T}; kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
     da = DualAverage(chains, T; kwargs...)
-    return StepsizeDualAverage(da, initial_stepsize, zero(initial_stepsize), initializer)
+    return StepsizeDualAverage(da, initial_stepsize, zero(initial_stepsize))
 end
 
 function update!(ssa::StepsizeDualAverage, αs, args...; kwargs...)
@@ -74,7 +70,6 @@ end
 struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
-    initializer::Symbol
 end
 
 """
@@ -83,10 +78,10 @@ end
 Construct a stepsize adapter for which the stepsize is fixed at it's initial value.
 """
 function StepsizeConstant(
-    initial_stepsize::AbstractVector{T}; initializer=:none, kwargs...
+    initial_stepsize::AbstractVector{T}; kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
-    return StepsizeConstant(initial_stepsize, initial_stepsize, initializer)
+    return StepsizeConstant(initial_stepsize, initial_stepsize)
 end
 
 function update!(ssc::StepsizeConstant, args...; kwargs...) end
@@ -100,13 +95,12 @@ end
 struct StepsizeECA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
-    initializer::Symbol
 end
 
 function StepsizeECA(
-    initial_stepsize::AbstractVector{T}; initializer=:meads, kwargs...
+    initial_stepsize::AbstractVector{T}; kwargs...
 ) where {T<:AbstractFloat}
-    return StepsizeECA(initial_stepsize, initial_stepsize, initializer)
+    return StepsizeECA(initial_stepsize, initial_stepsize)
 end
 
 function update!(seca::StepsizeECA, ldg, positions, scale, idx, args...; kwargs...)

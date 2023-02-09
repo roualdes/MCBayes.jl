@@ -1,38 +1,27 @@
-function initialize_stepsize!(stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
-    init_stepsize!(
-        stepsize_adapter.initializer,
-        stepsize_adapter,
-        sampler,
-        rngs,
-        ldg,
-        positions;
-        kwargs...,
-    )
-end
+struct StepsizeInitializer end
 
-function init_stepsize!(
-    method::Symbol, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
-)
-    init_stepsize!(
-        Val{method}(), stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
-    )
-end
-
-function init_stepsize!(
-    ::Val{:mh}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...
-)
-    dims = size(positions, 1)
-    stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
-end
-
-function init_stepsize!(
-    ::Val{:none}, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
+function initialize_stepsize!(
+    initialzer::StepsizeInitializer,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
 ) end
 
-function init_stepsize!(
-    ::Val{:stan}, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...
+struct StepsizeInitializerStan end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerStan,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
 )
-    stepsize = stepsize_adapter.stepsize
+    stepsize = sampler.stepsize
     metric = sampler.metric
 
     for chain in axes(positions, 2)
@@ -101,8 +90,31 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     return stepsize
 end
 
-function init_stepsize!(
-    ::Val{:meads}, stepsize_adapter, sampler, rngs, ld, positions; kwargs...
+struct StepsizeInitializerRWM end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerRWM,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+)
+    dims = size(positions, 1)
+    stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
+end
+
+struct StepsizeInitializerMEADS end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerMEADS,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
 )
     for f in 1:(sampler.folds)
         k = (f + 1) % sampler.folds + 1

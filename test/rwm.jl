@@ -1,4 +1,4 @@
-@testset "Metropolis" begin
+@testset "Random Walk Metropolis" begin
     iterations = 30_000
     warmup = 20_000
 
@@ -8,8 +8,8 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
+        rwm = RWM(dims)
+        draws, diagnostics, rngs = sample!(rwm, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -22,8 +22,8 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
+        rwm = RWM(dims)
+        draws, diagnostics, rngs = sample!(rwm, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -36,8 +36,8 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
+        rwm = RWM(dims)
+        draws, diagnostics, rngs = sample!(rwm, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -50,10 +50,10 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.6, initializer=:mh)
-        mh = MH(dims)
+        ssda = StepsizeDualAverage(ones(4); δ=0.6)
+        rwm = RWM(dims)
         draws, diagnostics, rngs = sample!(
-            mh, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
+            rwm, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
         )
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
@@ -69,8 +69,8 @@
     #     ld = prepare_log_density(bsm)
 
     #     ssc = StepsizeConstant(ones(4))
-    #     mh = MH(dims)
-    #     draws, diagnostics, rngs = sample!(mh, ld;
+    #     rwm = RWM(dims)
+    #     draws, diagnostics, rngs = sample!(rwm, ld;
     #                                        stepsize_adapter = ssc,
     #                                        warmup=warmup,
     #                                        iterations=iterations)
@@ -89,8 +89,8 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
+        rwm = RWM(dims)
+        draws, diagnostics, rngs = sample!(rwm, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -106,10 +106,10 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.6, initializer=:mh)
-        mh = MH(dims)
+        ssda = StepsizeDualAverage(ones(4); δ=0.6)
+        rwm = RWM(dims)
         draws, diagnostics, rngs = sample!(
-            mh, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
+            rwm, ld; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
         )
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
@@ -123,8 +123,8 @@
         dims = BS.param_unc_num(bsm)
         ld = prepare_log_density(bsm)
 
-        mh = MH(dims)
-        draws, diagnostics, rngs = sample!(mh, ld; warmup=warmup, iterations=iterations)
+        rwm = RWM(dims)
+        draws, diagnostics, rngs = sample!(rwm, ld; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
         true_means = expectations[model_name][:true_mean]

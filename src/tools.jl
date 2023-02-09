@@ -1,14 +1,5 @@
 function hmc!(
-    position,
-    position_next,
-    ldg,
-    rng,
-    dims,
-    metric,
-    stepsize,
-    steps,
-    maxdeltaH;
-    kwargs...,
+    position, position_next, ldg, rng, dims, metric, stepsize, steps, maxdeltaH; kwargs...
 )
     T = eltype(position)
     q = copy(position)
@@ -18,7 +9,9 @@ function hmc!(
     H0 = hamiltonian(ld, p)
     isnan(H0) && (H0 = typemax(T))
 
-    ld, gradient = leapfrog!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...)
+    ld, gradient = leapfrog!(
+        q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
+    )
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
@@ -32,7 +25,7 @@ function hmc!(
         position_next .= position
     end
 
-    return (; accepted, divergent, acceptstat=a, energy = H)
+    return (; accepted, divergent, acceptstat=a, energy=H)
 end
 
 function pghmc!(
