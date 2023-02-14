@@ -12,8 +12,17 @@ function set!(sampler, tla::AbstractTrajectorylengthAdapter, args...; kwargs...)
     end
 end
 
+"""
+# Adapted from
+# [1] https://arxiv.org/pdf/2110.11576.pdf
+# [2] https://proceedings.mlr.press/v130/hoffman21a.html
+# [3] https://github.com/tensorflow/probability/blob/c678caa1b8e94ab3677a37e581e8b19e68e59248/tensorflow_probability/python/experimental/mcmc/gradient_based_trajectory_length_adaptation.py
+# [4] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/sga_hmc.py
+# [5] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/fun_mc_lib.py
+"""
 struct TrajectorylengthChEES{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     adam::Adam{T}
+    om::OnlineMoments{T}
     trajectorylength::Vector{T}
     trajectorylength_bar::Vector{T}
     maxleapfrogsteps::Int
@@ -22,13 +31,68 @@ end
 function TrajectorylengthChEES(
     initial_trajectorylength::AbstractVector{T}; maxleapfrogsteps = 1000, kwargs...) where {T}
     adam = Adam(1, T; kwargs...)
-    return TrajectorylengthChEES(adam, initial_trajectorylength, zeros(T, 1), zeros(T, 1), maxleapfrogsteps)
+    om = OnlineMoments(T, dims, 1)
+    return TrajectorylengthChEES(adam, om, initial_trajectorylength, zeros(T, 1), zeros(T, 1), maxleapfrogsteps)
 end
 
-function update!(tlc::TrajectorylengthChEES, m, αs, draws, stepsize, args...; γ=-0.6, kwargs...)
-   ghats = trajectorylength_gradient(m, αs, draws)
+function update!(tlc::TrajectorylengthChEES, m, αs, draws, ps, qs, stepsize, args...; γ=-0.6, kwargs...)
+    update!(tlc.om, draws[m, :, :]; kwargs...)
+    αbar = inv(mean(inv, αs))
+    ghats = if αbar < 1e-4      # [3]#L733
+        zero(αs)
+    else
+        trajectorylength_gradient(tlc, m+1, αs, draws, ps, qs, stepsize)
+    end
+
+    !all(isfinite.(ghats)) && (ghats .= zero(ghats))
+    ghat = wmean(ghats, αs)
+    as = update!(tlc.adam, ghat, m+1)
+    
+    logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
+    T = tlc.trajectorylength * exp(logupdate)        # [3]#L761
+    T = clamp(T, 0, stepsize * tlc.maxleapfrogsteps) # [3]#L773
+
+    tlc.trajectorylength = T
+    aw = m ^ γ
+    tlc.trajectorylength_bar = exp(aw * log(T) + (1 - aw) * log(1e-10 + tlc.trajectorylength_bar))
 end
 
+function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs, draws, ps, qs, stepsize)
+    _, dims, chains = size(draws)
+
+    meanθ = zeros(dims)
+    meanq = zeros(dims)
+    v = zero(eltype(draws))
+
+    for chain in 1:chains
+        @. meanθ += (draws[m+1, :, chain] - meanθ)
+        a = αs[chain]
+        v += a
+        @. meanq += a * (qs[:, chain] - meanq) / v
+    end
+    
+    mw = tlc.om.n[1] / (tlc.om.n[1] + chains)
+    @. meanθ = mw * tlc.om.m + (1 - mw) * meanθ
+    @. meanq = mw * tlc.om.m + (1 - mw) * meanq
+
+    ghats = sampler_trajectorylength_gradient(tlc, m, draws, ps, qs, stepsize, meanθ, meanq)
+    return ghats
+end
+
+function sampler_trajectorylength_gradient(tlc::TrajectorylengthChEES, m, draws, ps, qs, stepsize, mθ, mq)
+    t = tlc.trajectorylength + stepsize
+    h = halton(m)
+    T = eltype(draws)
+    _, dims, chains = size(draws)
+    ghats = zeros(chains)
+    for chain in 1:chains
+        q = qs[:, chain]
+        dsq = centered_cumsum(abs2, q, mq) - centered_cumsum(abs2, draws[m, :, chain], mθ)
+        ghats[chain] = 4 * dsq * centered_dot(q, mq, ps[:, chain]) - dsq ^ 2 / t
+        ghats[chain] *= h
+    end
+    return ghats
+end
 
 struct TrajectorylengthConstant{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     trajectorylength::Vector{T}

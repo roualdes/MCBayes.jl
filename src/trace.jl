@@ -1,4 +1,5 @@
-# TODO sampler specific records is the only way forward here
+# TODO sampler specific records is the only way forward here; especially for SGA methods
+# until we redesign things to have their own sample!() methods
 function record!(trace::NamedTuple, info, iteration, chain)
     keys = (
         :accepted,
@@ -72,6 +73,7 @@ function trace(sampler::AbstractSGA{T}, iterations) where {T}
             accepted=zeros(Bool, iterations, chains),
             stepsize=zeros(T, iterations, 1),
             position=zeros(T, dims, chains),
+            momentum=zeros(T, dims, chains),
             trajectorylength=zeros(T, iterations, 1),
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),

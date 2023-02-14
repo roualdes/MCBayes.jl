@@ -25,7 +25,7 @@ function hmc!(
         position_next .= position
     end
 
-    return (; accepted, divergent, acceptstat=a, energy=H)
+    return (; accepted, divergent, position, acceptstat=a, energy=H, momentum=p)
 end
 
 function pghmc!(
@@ -137,4 +137,32 @@ function standardize_draws(x)
     location = mean(z; dims=2)
     z .-= location
     return z, scale
+end
+
+function weighted_mean(x, w)
+    T = eltype(x)
+    a = zero(T)
+    m = zero(T)
+    for i in eachindex(x, w)
+        wi = w[i]
+        a += wi
+        m += wi * (x[i] - m) / a
+    end
+    return m
+end
+
+function centered_cumsum(f, x, mx = zero(x))
+    s = zero(eltype(f(first(x))))
+    for n in eachindex(x, mx)
+        s += f(x[n] - mx[n])
+    end
+    return s
+end
+
+function centered_dot(x, mx, y, my = zero(y))
+    s = zero(eltype(dot(first(x), first(y))))
+    for n in eachindex(x, y)
+        s += (x[n] - mx[n]) * (y[n] - my[n])
+    end
+    return s
 end
