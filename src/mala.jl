@@ -57,7 +57,7 @@ function transition!(sampler::MALA, m, ldg, draws, rngs, trace; kwargs...)
                 1000,
                 kwargs...,
             )
-            record!(trace, info, m + 1, chain)
+            record!(sampler, trace, info, m + 1, chain)
         end
     end
 end

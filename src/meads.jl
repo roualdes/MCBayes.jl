@@ -121,6 +121,7 @@ function transition!(sampler::MEADS, m, ldg, draws, rngs, trace; kwargs...)
                         sampler.acceptprob[chain:chain],
                         sampler.noise[f],
                         sampler.drift[f],
+                        sampler.damping[f],
                         sampler.nru,
                         sampler.maxdeltaH;
                         kwargs...,
@@ -128,8 +129,7 @@ function transition!(sampler::MEADS, m, ldg, draws, rngs, trace; kwargs...)
                     # TODO at least consider doing "adaptation" in here for speed,
                     # since technically this algorithm doesn't "adapt"
 
-                    # TODO not properly recording diagnostics
-                    #record!(trace, info, m + 1, chain)
+                    record!(sampler, trace, info, m + 1, chain, f)
                 else
                     draws[m + 1, :, chain] = draws[m, :, chain]
                 end

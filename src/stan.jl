@@ -73,7 +73,7 @@ function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
                 ldg;
                 kwargs...,
             )
-            record!(trace, info, m + 1, chain)
+            record!(sampler, trace, info, m + 1, chain)
         end
     end
 end

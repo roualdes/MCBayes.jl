@@ -131,7 +131,7 @@ struct SGAAdaptationSchedule end
 
 function adapt!(
     sampler,
-    schedule::EnsembleChainSchedule,
+    schedule::SGAAdaptationSchedule,
     trace,
     m,
     ldg,
@@ -155,8 +155,8 @@ function adapt!(
         set!(sampler, stepsize_adapter; kwargs...)
 
         if m > trajectorylength_delay
-            # update!(sampler, trajectorylength_adapter, ...)
-            # set!(sampler, trajectorylength_adapter, ...)
+            update!(sampler, trajectorylength_adapter, m + 1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize; kwargs...)
+            set!(sampler, trajectorylength_adapter; kwargs...)
         end
 
         @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
@@ -167,6 +167,6 @@ function adapt!(
 
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-        # set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
+        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end

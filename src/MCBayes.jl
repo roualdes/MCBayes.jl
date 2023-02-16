@@ -28,6 +28,7 @@ include("stan.jl")
 include("rwm.jl")
 include("meads.jl")
 include("mala.jl")
+include("sga.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -132,7 +133,7 @@ function run_sampler!(
 
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 
-    @views initialize_stepsize!(
+    initialize_stepsize!(
         stepsize_initializer,
         stepsize_adapter,
         sampler,
@@ -141,7 +142,6 @@ function run_sampler!(
         draws[1, :, :];
         kwargs...,
     )
-    set!(sampler, stepsize_adapter; kwargs...)
 
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)

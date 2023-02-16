@@ -25,7 +25,7 @@ function initialize_stepsize!(
     metric = sampler.metric
 
     for chain in axes(positions, 2)
-        @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(
+        stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             stepsize[chain],
             metric[:, chain],
             rngs[chain],
@@ -34,6 +34,7 @@ function initialize_stepsize!(
             kwargs...,
         )
     end
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
 function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
@@ -103,6 +104,7 @@ function initialize_stepsize!(
 )
     dims = size(positions, 1)
     stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
 struct StepsizeInitializerMEADS end
@@ -125,6 +127,7 @@ function initialize_stepsize!(
 
         update!(stepsize_adapter, ldg, q, sigma, f; kwargs...)
     end
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
 # # TODO needs a second look

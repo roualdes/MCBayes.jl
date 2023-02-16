@@ -23,7 +23,7 @@ function sample!(
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerStan(),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.6),
-    # TODO trajectorylength_adapter=TrajectorylengthChEES(),
+    trajectorylength_adapter=TrajectorylengthChEES(),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
@@ -87,6 +87,9 @@ end
 function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
+    u = halton(i)
+    j = 2 * u * sampler.trajectorylength
+    L = max(1, ceil(Int, j / sampler.stepsize))
     @sync for it in 1:nt
         Threads.@spawn for chain in it:nt:chains
             @views info = hmc!(
@@ -97,11 +100,11 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
                 sampler.dims,
                 sampler.metric[:, chain],
                 sampler.stepsize,
-                sampler.trajectorylength,
+                L,
                 1000,
                 kwargs...,
             )
-            record!(trace, info, m + 1, chain)
+            record!(sampler, trace, info, m + 1, chain)
         end
     end
 end

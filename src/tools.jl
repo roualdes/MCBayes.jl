@@ -40,6 +40,7 @@ function pghmc!(
     acceptance_probability,
     noise,
     drift,
+    damping,
     nonreversible_update,
     maxdeltaH;
     kwargs...,
@@ -56,7 +57,7 @@ function pghmc!(
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
-    divergent = (H - H0) > maxdeltaH
+    divergence = (H - H0) > maxdeltaH
 
     a = H0 - H
     accepted = log(abs(acceptance_probability[])) < a
@@ -77,7 +78,7 @@ function pghmc!(
         rand(rng, T)
     end
 
-    return (; accepted, divergent, energy, acceptstat=a > zero(a) ? one(a) : exp(a))
+    return (; accepted, divergence, energy, acceptstat=a > zero(a) ? one(a) : exp(a), noise, drift, damping, stepsize)
 end
 
 function rand_momentum(rng, dims, metric)

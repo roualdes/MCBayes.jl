@@ -41,13 +41,13 @@ function update!(tlc::TrajectorylengthChEES, m, αs, draws, ps, qs, stepsize, ar
     ghats = if αbar < 1e-4      # [3]#L733
         zero(αs)
     else
-        trajectorylength_gradient(tlc, m+1, αs, draws, ps, qs, stepsize)
+        trajectorylength_gradient(tlc, m, αs, draws, ps, qs, stepsize)
     end
 
     !all(isfinite.(ghats)) && (ghats .= zero(ghats))
     ghat = wmean(ghats, αs)
     as = update!(tlc.adam, ghat, m+1)
-    
+
     logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
     T = tlc.trajectorylength * exp(logupdate)        # [3]#L761
     T = clamp(T, 0, stepsize * tlc.maxleapfrogsteps) # [3]#L773
@@ -70,7 +70,7 @@ function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs,
         v += a
         @. meanq += a * (qs[:, chain] - meanq) / v
     end
-    
+
     mw = tlc.om.n[1] / (tlc.om.n[1] + chains)
     @. meanθ = mw * tlc.om.m + (1 - mw) * meanθ
     @. meanq = mw * tlc.om.m + (1 - mw) * meanq
