@@ -23,9 +23,9 @@ function sample!(
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerStan(),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.6),
-    trajectorylength_adapter=TrajectorylengthChEES(),
+    trajectorylength_adapter=TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
     metric_adapter=MetricOnlineMoments(sampler.metric),
-    adaptation_schedule=WindowedAdaptationSchedule(warmup),
+    adaptation_schedule=SGAAdaptationSchedule(warmup),
     kwargs...,
 )
     return run_sampler!(
@@ -101,7 +101,7 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
                 sampler.metric[:, chain],
                 sampler.stepsize,
                 L,
-                1000,
+                1000;
                 kwargs...,
             )
             record!(sampler, trace, info, m + 1, chain)

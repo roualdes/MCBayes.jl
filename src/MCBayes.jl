@@ -183,4 +183,7 @@ draws, diagnostics, rngs = sample!(meads, ldg)
 mala = MALA(10)
 draws, diagnostics, rngs = sample!(mala, ldg)
 
+chees = ChEES(10)
+draws, diagnostics, rngs = sample!(chees, ldg)
+
 end

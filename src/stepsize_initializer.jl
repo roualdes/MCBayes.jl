@@ -23,11 +23,13 @@ function initialize_stepsize!(
 )
     stepsize = sampler.stepsize
     metric = sampler.metric
+    num_metrics = size(metric, 2)
+    num_chains = size(positions, 2)
 
-    for chain in axes(positions, 2)
+    for (metric, chain) in zip(Iterators.cycle(1:num_metrics), 1:num_chains)
         stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             stepsize[chain],
-            metric[:, chain],
+            metric[:, metric],
             rngs[chain],
             ldg,
             positions[:, chain];
@@ -130,26 +132,35 @@ function initialize_stepsize!(
     set!(sampler, stepsize_adapter; kwargs...)
 end
 
-# # TODO needs a second look
-# function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg, draws; kwargs...)
-#     T = eltype(draws[1][1][1])
-#     chains = length(draws[1])
-#     num_metrics = size(metrics, 2)
+struct StepsizeInitializerSGA end
 
-#     αs = zeros(T, chains)
-#     ε = 2 * one(T)
-#     harmonic_mean = zero(T)
-#     tmp = similar(draws[1][1])
+function init_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sampler, rng, ldg, positions; kwargs...)
+    T = eltype(draws)
+    num_chains = size(draws, 2)
+    num_metrics = size(metrics, 2)
 
-#     while harmonic_mean < oftype(x, 0.5)
-#         ε /= 2
+    αs = zeros(T, chains)
+    stepsize = 2 * one(T)
+    harmonic_mean = zero(T)
+    tmp = similar(positions)
+    onehalf = oftype(T, 0.5)
 
-#         for (metric, chain) in zip(Iterators.cylce(1:metrics), 1:chains)
-#             # TODO keep, if this is needed. Otherwise, ditch. adapter.ε = ε
-#             # TODO info = hmc!()
-#             αs[chain] = info.acceptstat
-#         end
-#         harmonic_mean = inv(mean(inv, αs))
-#     end
-#     adapter.ε = ε
-# end
+    while harmonic_mean < onehalf
+        ε /= 2
+        for (metric, chain) in zip(Iterators.cycle(1:num_metrics), 1:num_chains)
+            info = hmc!(positions[:, chain],
+                        tmp[:, chain],
+                        ldg,
+                        sampler.rngs[chain],
+                        sampler.dims,
+                        sampler.metric[:, metric],
+                        sampler.stepsize,
+                        1,
+                        1000;
+                        kwargs...)
+            αs[chain] = info.acceptstat
+        end
+        harmonic_mean = inv(mean(inv, αs))
+    end
+    set!(sampler, stepsize_adapter; kwargs...)
+end

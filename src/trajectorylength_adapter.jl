@@ -29,10 +29,10 @@ struct TrajectorylengthChEES{T<:AbstractFloat} <: AbstractTrajectorylengthAdapte
 end
 
 function TrajectorylengthChEES(
-    initial_trajectorylength::AbstractVector{T}; maxleapfrogsteps = 1000, kwargs...) where {T}
+    initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps = 1000, kwargs...) where {T}
     adam = Adam(1, T; kwargs...)
     om = OnlineMoments(T, dims, 1)
-    return TrajectorylengthChEES(adam, om, initial_trajectorylength, zeros(T, 1), zeros(T, 1), maxleapfrogsteps)
+    return TrajectorylengthChEES(adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps)
 end
 
 function update!(tlc::TrajectorylengthChEES, m, αs, draws, ps, qs, stepsize, args...; γ=-0.6, kwargs...)

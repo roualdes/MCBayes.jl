@@ -127,7 +127,9 @@ function adapt!(
     end
 end
 
-struct SGAAdaptationSchedule end
+struct SGAAdaptationSchedule
+    warmup::Int
+end
 
 function adapt!(
     sampler,
