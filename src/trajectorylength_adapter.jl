@@ -45,16 +45,16 @@ function update!(tlc::TrajectorylengthChEES, m, αs, draws, ps, qs, stepsize, ar
     end
 
     !all(isfinite.(ghats)) && (ghats .= zero(ghats))
-    ghat = wmean(ghats, αs)
+    ghat = weighted_mean(ghats, αs)
     as = update!(tlc.adam, ghat, m+1)
 
-    logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
-    T = tlc.trajectorylength * exp(logupdate)        # [3]#L761
+    logupdate = clamp(as[1], -0.35, 0.35)               # [3]#L759
+    T = tlc.trajectorylength[1] * exp(logupdate)        # [3]#L761
     T = clamp(T, 0, stepsize * tlc.maxleapfrogsteps) # [3]#L773
 
-    tlc.trajectorylength = T
+    tlc.trajectorylength[1] = T
     aw = m ^ γ
-    tlc.trajectorylength_bar = exp(aw * log(T) + (1 - aw) * log(1e-10 + tlc.trajectorylength_bar))
+    tlc.trajectorylength_bar[1] = exp(aw * log(T) + (1 - aw) * log(1e-10 + tlc.trajectorylength_bar[1]))
 end
 
 function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs, draws, ps, qs, stepsize)
@@ -65,22 +65,22 @@ function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs,
     v = zero(eltype(draws))
 
     for chain in 1:chains
-        @. meanθ += (draws[m+1, :, chain] - meanθ)
+        @. meanθ += draws[m+1, :, chain] - meanθ
         a = αs[chain]
         v += a
         @. meanq += a * (qs[:, chain] - meanq) / v
     end
 
-    mw = tlc.om.n[1] / (tlc.om.n[1] + chains)
-    @. meanθ = mw * tlc.om.m + (1 - mw) * meanθ
-    @. meanq = mw * tlc.om.m + (1 - mw) * meanq
+    mw = tla.om.n[1] / (tla.om.n[1] + chains)
+    @. meanθ = mw * tla.om.m + (1 - mw) * meanθ
+    @. meanq = mw * tla.om.m + (1 - mw) * meanq
 
-    ghats = sampler_trajectorylength_gradient(tlc, m, draws, ps, qs, stepsize, meanθ, meanq)
+    ghats = sampler_trajectorylength_gradient(tla, m, draws, ps, qs, stepsize, meanθ, meanq)
     return ghats
 end
 
 function sampler_trajectorylength_gradient(tlc::TrajectorylengthChEES, m, draws, ps, qs, stepsize, mθ, mq)
-    t = tlc.trajectorylength + stepsize
+    t = tlc.trajectorylength[1] + stepsize
     h = halton(m)
     T = eltype(draws)
     _, dims, chains = size(draws)

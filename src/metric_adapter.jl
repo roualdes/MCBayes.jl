@@ -86,7 +86,7 @@ function MetricFisherDivergence(initial_metric::AbstractMatrix{T}; kwargs...) wh
 end
 
 function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...; kwargs...)
-    grads = similar(mfd.metric)
+    grads = similar(x)
     for c in axes(grads, 2)
         _, grads[:, c] = ldg(x[:, c]; kwargs...)
     end

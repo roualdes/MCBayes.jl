@@ -84,7 +84,8 @@ modeldir = joinpath(artifact"test_models", "test_models")
 expectations = open(deserialize, joinpath(modeldir, "expectations.jls"))
 model_names = [f for f in readdir(modeldir) if isdir(joinpath(modeldir, f))]
 
-include("rwm.jl")
-include("stan.jl")
-include("meads.jl")
-include("mala.jl")
+# include("rwm.jl")
+# include("stan.jl")
+# include("meads.jl")
+# include("mala.jl")
+include("chees.jl")

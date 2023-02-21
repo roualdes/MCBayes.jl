@@ -133,14 +133,14 @@ function record!(sampler::AbstractSGA{T}, trace::NamedTuple, info, iteration, ch
         :acceptstat,
         :divergence,
         :energy,
-        :stepsize,
-        :trajectorlength,
     )
     for k in keys
         if haskey(info, k)
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:trajectorylength][iteration] = info[:trajectorylength]
+    trace[:stepsize][iteration] = info[:stepsize]
     trace[:momentum] .= info[:momentum]
     trace[:position] .= info[:position]
 end

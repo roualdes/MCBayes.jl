@@ -22,17 +22,22 @@ function initialize_stepsize!(
     kwargs...,
 )
     stepsize = sampler.stepsize
+    num_stepsizes = length(stepsize)
+    
     metric = sampler.metric
     num_metrics = size(metric, 2)
     num_chains = size(positions, 2)
 
-    for (metric, chain) in zip(Iterators.cycle(1:num_metrics), 1:num_chains)
-        stepsize_adapter.stepsize[chain] = stan_init_stepsize(
-            stepsize[chain],
-            metric[:, metric],
-            rngs[chain],
+    cycle_stepsizes = Iterators.cycle(1:num_stepsizes)
+    cycle_metrics = Iterators.cycle(1:num_metrics)
+
+    for (s, m, c) in zip(cycle_stepsizes, cycle_metrics, 1:num_chains)
+        stepsize_adapter.stepsize[s] = stan_init_stepsize(
+            stepsize[s],
+            metric[:, m],
+            rngs[c],
             ldg,
-            positions[:, chain];
+            positions[:, c];
             kwargs...,
         )
     end
@@ -146,15 +151,15 @@ function init_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sa
     onehalf = oftype(T, 0.5)
 
     while harmonic_mean < onehalf
-        ε /= 2
-        for (metric, chain) in zip(Iterators.cycle(1:num_metrics), 1:num_chains)
-            info = hmc!(positions[:, chain],
-                        tmp[:, chain],
+        stepsize /= 2
+        for (m, c) in zip(Iterators.cycle(1:num_metrics), 1:num_chains)
+            info = hmc!(positions[:, c],
+                        tmp[:, c],
                         ldg,
-                        sampler.rngs[chain],
+                        sampler.rngs[c],
                         sampler.dims,
-                        sampler.metric[:, metric],
-                        sampler.stepsize,
+                        sampler.metric[:, m],
+                        stepsize,
                         1,
                         1000;
                         kwargs...)
@@ -162,5 +167,7 @@ function init_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sa
         end
         harmonic_mean = inv(mean(inv, αs))
     end
+    stepsize_adapter.stepsize .= stepsize
+    stepsize_adapter.stepsize_bar .= stepsize
     set!(sampler, stepsize_adapter; kwargs...)
 end

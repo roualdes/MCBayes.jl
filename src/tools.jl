@@ -25,7 +25,7 @@ function hmc!(
         position_next .= position
     end
 
-    return (; accepted, divergent, position, acceptstat=a, energy=H, momentum=p)
+    return (; accepted, divergent, position, acceptstat=a, energy=H, momentum=p, stepsize)
 end
 
 function pghmc!(
