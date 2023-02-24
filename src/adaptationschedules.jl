@@ -154,7 +154,7 @@ function adapt!(
 
         accept_stats = trace.acceptstat[m, :]
         abar = inv(mean(inv, accept_stats))
-        update!(stepsize_adapter, abar; warmup, kwargs...)
+        update!(stepsize_adapter, abar, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         if m > trajectorylength_delay

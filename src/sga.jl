@@ -21,8 +21,8 @@ function sample!(
     iterations=2000,
     warmup=iterations,
     draws_initializer=DrawsInitializerStan(),
-    stepsize_initializer=StepsizeInitializerStan(),
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.6),
+    stepsize_initializer=StepsizeInitializerSGA(),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
     trajectorylength_adapter=TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
@@ -64,8 +64,8 @@ function sample!(
     iterations=2000,
     warmup=iterations,
     draws_initializer=DrawsInitializerStan(),
-    stepsize_initializer=StepsizeInitializerStan(),
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.6),
+    stepsize_initializer=StepsizeInitializerSGA(),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
     # TODO trajectorylength_adapter=Trajectorylength(),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
@@ -88,10 +88,15 @@ end
 function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
-    u = halton(m)
-    j = 2 * u * sampler.trajectorylength[1]
+    println("iteration $m")
     stepsize = sampler.stepsize[1]
-    L = max(1, ceil(Int, j / stepsize))
+    println("stepsize = $stepsize")
+    u = halton(m)
+    trajectorylength = m > 100 ? sampler.trajectorylength[1] : stepsize
+    j = 2 * u * trajectorylength
+    steps = max(1, ceil(Int, j / stepsize))
+    metric = sampler.metric[:, 1]
+    metric ./= maximum(metric)
     @sync for it in 1:nt
         Threads.@spawn for chain in it:nt:chains
             @views info = hmc!(
@@ -100,13 +105,13 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
                 ldg,
                 rngs[chain],
                 sampler.dims,
-                sampler.metric[:, 1],
+                metric,
                 stepsize,
-                L,
+                steps,
                 1000;
                 kwargs...,
             )
-            info = (; info..., trajectorylength = sampler.trajectorylength[1])
+            info = (; info..., trajectorylength)
             record!(sampler, trace, info, m + 1, chain)
         end
     end
