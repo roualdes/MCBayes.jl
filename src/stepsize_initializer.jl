@@ -25,17 +25,18 @@ function initialize_stepsize!(
 )
     stepsize = sampler.stepsize
     num_stepsizes = length(stepsize)
+    cycle_stepsizes = Iterators.cycle(1:num_stepsizes)
 
     metric = sampler.metric
     num_metrics = size(metric, 2)
-    num_chains = size(positions, 2)
-
-    cycle_stepsizes = Iterators.cycle(1:num_stepsizes)
     cycle_metrics = Iterators.cycle(1:num_metrics)
 
-    # TODO need check that length(stepsize) == length(chains) == length(metrics)
-    for (s, m, c) in zip(cycle_stepsizes, cycle_metrics, 1:num_chains)
-        stepsize_adapter.stepsize[s] = stan_init_stepsize(
+    num_chains = size(positions, 2)
+    T = eltype(stepsize_adapter)
+    stepsize_tmp = zeros(T, num_chains)
+
+    for (c, s, m) in zip(1:num_chains, cycle_stepsizes, cycle_metrics)
+        stepsize_tmp[c] = stan_init_stepsize(
             stepsize[s],
             metric[:, m],
             rngs[c],
@@ -43,6 +44,16 @@ function initialize_stepsize!(
             positions[:, c];
             kwargs...,
         )
+    end
+
+    if num_stepsizes == 1
+        stepsize_adapter.stepsize .= minimum(stepsize_tmp)
+        stepsize_adapter.stepsize_bar .= minimum(stepsize_tmp)
+    elseif num_stepsizes == num_chains
+        stepsize_adapter.stepsize .= stepsize_tmp
+        stepsize_adapter.stepsize_bar .= stepsize_tmp
+    else
+        error("initialize_stepsize() doesn't know how to initialize $(num_stepsizes) stepsizes with $(num_chains) chains.")
     end
     set!(sampler, stepsize_adapter; kwargs...)
 end
@@ -143,27 +154,27 @@ end
 struct StepsizeInitializerSGA end
 
 function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
-    T = eltype(positions)
-    chains = size(positions, 2)
+    T = eltype(stepsize_adapter)
+    num_chains = size(positions, 2)
 
-    αs = zeros(T, chains)
+    αs = zeros(T, num_chains)
     stepsize = 2 * sampler.stepsize[1]
     harmonic_mean = zero(T)
     tmp = similar(positions)
 
-    # TODO check there's just one metric
-    metric = sampler.metric[:, 1]
-    metric ./= maximum(metric)
+    metric = sampler.metric
+    num_metrics = size(metric, 2)
+    cycle_metrics = Iterators.cycle(1:num_metrics)
 
     while harmonic_mean < oftype(harmonic_mean, 0.5)
         stepsize /= 2
-        for c in 1:chains
+        for (c, m) in zip(1:num_chains, cycle_metrics)
             info = hmc!(positions[:, c],
                         tmp[:, c],
                         ldg,
                         rngs[c],
                         sampler.dims,
-                        metric,
+                        metric[:, m],
                         stepsize,
                         1,
                         1000;
@@ -172,6 +183,7 @@ function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapt
         end
         harmonic_mean = inv(mean(inv, αs))
     end
+
     stepsize_adapter.stepsize .= stepsize
     stepsize_adapter.stepsize_bar .= stepsize
     set!(sampler, stepsize_adapter; kwargs...)

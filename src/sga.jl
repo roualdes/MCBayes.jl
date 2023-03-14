@@ -88,9 +88,7 @@ end
 function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
-    println("iteration $m")
     stepsize = sampler.stepsize[1]
-    println("stepsize = $stepsize")
     u = halton(m)
     trajectorylength = m > 100 ? sampler.trajectorylength[1] : stepsize
     j = 2 * u * trajectorylength
