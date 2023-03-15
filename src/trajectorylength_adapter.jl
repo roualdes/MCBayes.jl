@@ -37,19 +37,17 @@ end
 
 function update!(tlc::TrajectorylengthChEES, m, αs, draws, ps, qs, stepsize, args...; γ=-0.6, kwargs...)
     update!(tlc.om, draws[m, :, :]; kwargs...)
+    ghats = trajectorylength_gradient(tlc, m, αs, draws, ps, qs, stepsize)
+
     αbar = inv(mean(inv, αs))
-    ghats = if αbar < 1e-4      # [3]#L733
-        zero(αs)
-    else
-        trajectorylength_gradient(tlc, m, αs, draws, ps, qs, stepsize)
-    end
-
+    αbar < 1e-4 && (ghats .= zero(ghats)) # [3]#L733
     !all(isfinite.(ghats)) && (ghats .= zero(ghats))
-    ghat = weighted_mean(ghats, αs)
-    as = update!(tlc.adam, ghat, m+1)
 
-    logupdate = clamp(as[1], -0.35, 0.35)               # [3]#L759
-    T = tlc.trajectorylength[1] * exp(logupdate)        # [3]#L761
+    ghat = weighted_mean(ghats, αs)
+    as = update!(tlc.adam, ghat, m)[1]
+
+    logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
+    T = tlc.trajectorylength[1] * exp(logupdate)     # [3]#L761
     T = clamp(T, 0, stepsize * tlc.maxleapfrogsteps) # [3]#L773
 
     tlc.trajectorylength[1] = T
@@ -65,7 +63,7 @@ function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs,
     v = zero(eltype(draws))
 
     for chain in 1:chains
-        @. meanθ += draws[m+1, :, chain] - meanθ
+        @. meanθ += draws[m, :, chain] - meanθ
         a = αs[chain]
         v += a
         @. meanq += a * (qs[:, chain] - meanq) / v

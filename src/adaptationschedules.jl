@@ -50,8 +50,13 @@ function adapt!(
         # to actually use update!() will require
         # more arguments, for additional information on which
         # the trajectorylength could be learned; re SGA methods
-        update!(trajectorylength_adapter; kwargs...)
-        set!(sampler, trajectorylength_adapter; kwargs...)
+
+        # if m > trajectorylength_delay
+        #     update!(trajectorylength_adapter, m + 1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
+        #     set!(sampler, trajectorylength_adapter; kwargs...)
+        # end
+        # update!(trajectorylength_adapter; kwargs...)
+        # set!(sampler, trajectorylength_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
@@ -146,7 +151,7 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay = 1000,
+    trajectorylength_delay = 100,
     kwargs...,
     )
     warmup = schedule.warmup
@@ -174,4 +179,26 @@ function adapt!(
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
         set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
+end
+
+struct NoAdaptationSchedule end
+
+function adapt!(
+    sampler,
+    schedule::NoAdaptationSchedule,
+    trace,
+    m,
+    ldg,
+    draws,
+    rngs,
+    metric_adapter,
+    stepsize_initializer,
+    stepsize_adapter,
+    trajectorylength_adapter,
+    damping_adapter,
+    noise_adapter,
+    drift_adapter;
+    trajectorylength_delay = 1000,
+    kwargs...,
+    )
 end

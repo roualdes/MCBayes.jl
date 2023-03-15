@@ -123,6 +123,7 @@ function trace(sampler::AbstractSGA{T}, iterations) where {T}
             momentum=zeros(T, dims, chains),
             position=zeros(T, dims, chains),
             stepsize=zeros(T, iterations, 1),
+            steps=zeros(Int, iterations, 1),
             trajectorylength=zeros(T, iterations, 1),
             )
 end
@@ -139,8 +140,9 @@ function record!(sampler::AbstractSGA{T}, trace::NamedTuple, info, iteration, ch
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:steps][iteration] = info[:steps]
     trace[:trajectorylength][iteration] = info[:trajectorylength]
     trace[:stepsize][iteration] = info[:stepsize]
-    trace[:momentum] .= info[:momentum]
-    trace[:position] .= info[:position]
+    trace[:momentum][:, chain] .= info[:momentum]
+    trace[:position][:, chain] .= info[:position]
 end

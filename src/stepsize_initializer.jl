@@ -1,5 +1,6 @@
 # TODO needs better name since the intention is to not initialize
 # TODO do the other initialized values need such a don't initialize type?
+
 struct StepsizeInitializer end
 
 function initialize_stepsize!(
@@ -16,43 +17,36 @@ struct StepsizeInitializerStan end
 
 function initialize_stepsize!(
     initialzer::StepsizeInitializerStan,
+    stepsize_adapter::StepsizeConstant,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+    )
+end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerStan,
     stepsize_adapter,
     sampler,
     rngs,
     ldg,
     positions;
     kwargs...,
-)
-    stepsize = sampler.stepsize
-    num_stepsizes = length(stepsize)
-    cycle_stepsizes = Iterators.cycle(1:num_stepsizes)
+    )
 
-    metric = sampler.metric
-    num_metrics = size(metric, 2)
-    cycle_metrics = Iterators.cycle(1:num_metrics)
-
-    num_chains = size(positions, 2)
-    T = eltype(stepsize_adapter)
-    stepsize_tmp = zeros(T, num_chains)
-
-    for (c, s, m) in zip(1:num_chains, cycle_stepsizes, cycle_metrics)
-        stepsize_tmp[c] = stan_init_stepsize(
-            stepsize[s],
-            metric[:, m],
-            rngs[c],
+    for chain in 1:size(positions, 2)
+        stepsize_adapter.stepsize[chain] = stan_init_stepsize(
+            sampler.stepsize[chain],
+            sampler.metric[:, chain],
+            rngs[chain],
             ldg,
-            positions[:, c];
+            positions[:, chain];
             kwargs...,
         )
     end
 
-    if num_stepsizes == 1
-        stepsize_adapter.stepsize .= inv(mean(inv, stepsize_tmp))
-    elseif num_stepsizes == num_chains
-        stepsize_adapter.stepsize .= stepsize_tmp
-    else
-        error("initialize_stepsize() doesn't know how to initialize $(num_stepsizes) stepsizes with $(num_chains) chains.")
-    end
     set!(sampler, stepsize_adapter; kwargs...)
 end
 
@@ -150,6 +144,17 @@ function initialize_stepsize!(
 end
 
 struct StepsizeInitializerSGA end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerSGA,
+    stepsize_adapter::StepsizeConstant,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+    )
+end
 
 function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
     T = eltype(stepsize_adapter)

@@ -79,6 +79,7 @@ function sample!(
         draws_initializer,
         stepsize_initializer,
         stepsize_adapter,
+        # trajectorylength_adapter,
         metric_adapter,
         adaptation_schedule,
         kwargs...,
@@ -88,8 +89,8 @@ end
 function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
-    stepsize = sampler.stepsize[1]
     trajectorylength = sampler.trajectorylength[1]
+    stepsize = sampler.stepsize[1]
     steps = max(1, ceil(Int, 2 * halton(m) * trajectorylength / stepsize))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)

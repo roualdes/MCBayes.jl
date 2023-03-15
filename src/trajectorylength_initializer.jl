@@ -1,3 +1,4 @@
+# TODO make structs to dispatch on; don't use symbols
 function initialize_trajectorylength!(method::Symbol, adapter, stepsize; kwargs...)
     return initialize_trajectorylength!(Val{method}(), adapter, stepsize; kwargs...)
 end
