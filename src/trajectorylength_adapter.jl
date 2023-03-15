@@ -63,13 +63,13 @@ function trajectorylength_gradient(tla::AbstractTrajectorylengthAdapter, m, αs,
     v = zero(eltype(draws))
 
     for chain in 1:chains
-        @. meanθ += draws[m, :, chain] - meanθ
+        @. meanθ += (draws[m, :, chain] - meanθ) / chain
         a = αs[chain]
         v += a
         @. meanq += a * (qs[:, chain] - meanq) / v
     end
 
-    mw = tla.om.n[1] / (tla.om.n[1] + chains)
+    mw = m / (m + chains)
     @. meanθ = mw * tla.om.m + (1 - mw) * meanθ
     @. meanq = mw * tla.om.m + (1 - mw) * meanq
 

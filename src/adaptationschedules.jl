@@ -163,11 +163,11 @@ function adapt!(
         set!(sampler, stepsize_adapter; kwargs...)
 
         if m > trajectorylength_delay
-            update!(trajectorylength_adapter, m + 1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
+            update!(trajectorylength_adapter, m+1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
             set!(sampler, trajectorylength_adapter; kwargs...)
         end
 
-        @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+        @views update!(metric_adapter, draws[m+1, :, :], ldg; kwargs...)
         w = m ^ -0.6    # TODO make an uniquely named keyword argument
         metric_adapter.metric .= w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
         set!(sampler, metric_adapter; kwargs...)
