@@ -43,7 +43,7 @@ function adapt!(
     warmup = schedule.warmup
     if m <= warmup
         accept_stats = trace.acceptstat[m, :]
-        update!(stepsize_adapter, accept_stats; warmup, kwargs...)
+        update!(stepsize_adapter, accept_stats, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         # TODO(ear) this is attempting to plan ahead;

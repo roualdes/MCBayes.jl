@@ -47,11 +47,9 @@ function initialize_stepsize!(
     end
 
     if num_stepsizes == 1
-        stepsize_adapter.stepsize .= minimum(stepsize_tmp)
-        stepsize_adapter.stepsize_bar .= minimum(stepsize_tmp)
+        stepsize_adapter.stepsize .= inv(mean(inv, stepsize_tmp))
     elseif num_stepsizes == num_chains
         stepsize_adapter.stepsize .= stepsize_tmp
-        stepsize_adapter.stepsize_bar .= stepsize_tmp
     else
         error("initialize_stepsize() doesn't know how to initialize $(num_stepsizes) stepsizes with $(num_chains) chains.")
     end
@@ -185,6 +183,5 @@ function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapt
     end
 
     stepsize_adapter.stepsize .= stepsize
-    stepsize_adapter.stepsize_bar .= stepsize
     set!(sampler, stepsize_adapter; kwargs...)
 end

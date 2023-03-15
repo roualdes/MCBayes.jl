@@ -64,10 +64,9 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        ma = MetricFisherDivergence(ones(dims, 4))
         mala = MALA(dims)
         draws, diagnostics, rngs = sample!(
-            mala, ldg; metric_adapter=ma, iterations=iterations, warmup=warmup
+            mala, ldg; iterations=iterations, warmup=warmup
         )
 
         constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
