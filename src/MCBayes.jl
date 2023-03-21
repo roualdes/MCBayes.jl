@@ -28,6 +28,7 @@ include("stan.jl")
 include("rwm.jl")
 include("meads.jl")
 include("mala.jl")
+include("sga.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -40,10 +41,15 @@ export Stan,
     RWM,
     MEADS,
     MALA,
+    ChEES,
+    WindowedAdaptationSchedule,
+    NoAdaptationSchedule,
+    SGAAdaptationSchedule,
     StepsizeInitializer,
     StepsizeInitializerStan,
     StepsizeInitializerMEADS,
     StepsizeInitializerRWM,
+    StepsizeInitializerSGA,
     DrawsInitializer,
     DrawsInitializerStan,
     DrawsInitializerRWM,
@@ -59,6 +65,7 @@ export Stan,
     StepsizeECA,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
+    TrajectorylengthChEES,
     DampingECA,
     DampingConstant,
     DriftECA,
@@ -132,7 +139,7 @@ function run_sampler!(
 
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 
-    @views initialize_stepsize!(
+    initialize_stepsize!(
         stepsize_initializer,
         stepsize_adapter,
         sampler,
@@ -141,7 +148,6 @@ function run_sampler!(
         draws[1, :, :];
         kwargs...,
     )
-    set!(sampler, stepsize_adapter; kwargs...)
 
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
@@ -182,5 +188,8 @@ draws, diagnostics, rngs = sample!(meads, ldg)
 
 mala = MALA(10)
 draws, diagnostics, rngs = sample!(mala, ldg)
+
+chees = ChEES(10)
+draws, diagnostics, rngs = sample!(chees, ldg)
 
 end

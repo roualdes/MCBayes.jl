@@ -1,9 +1,13 @@
+# TODO break this up into mean and variance
+# to enable one without the other, then
+# OnlineMoments is just the union of mean and var
 struct OnlineMoments{T<:AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
     v::Matrix{T}
 end
 
+# TODO T should come last to be more like Adam
 function OnlineMoments(T, d, c)
     return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
 end

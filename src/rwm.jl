@@ -55,7 +55,7 @@ function transition!(sampler::RWM, m, ld, draws, rngs, trace; kwargs...)
                 ld;
                 kwargs...,
             )
-            record!(trace, info, m + 1, chain)
+            record!(sampler, trace, info, m + 1, chain)
         end
     end
 end

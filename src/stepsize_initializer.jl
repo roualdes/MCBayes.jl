@@ -1,3 +1,6 @@
+# TODO needs better name since the intention is to not initialize
+# TODO do the other initialized values need such a don't initialize type?
+
 struct StepsizeInitializer end
 
 function initialize_stepsize!(
@@ -14,6 +17,16 @@ struct StepsizeInitializerStan end
 
 function initialize_stepsize!(
     initialzer::StepsizeInitializerStan,
+    stepsize_adapter::StepsizeConstant,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+) end
+
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerStan,
     stepsize_adapter,
     sampler,
     rngs,
@@ -21,19 +34,18 @@ function initialize_stepsize!(
     positions;
     kwargs...,
 )
-    stepsize = sampler.stepsize
-    metric = sampler.metric
-
-    for chain in axes(positions, 2)
-        @views stepsize_adapter.stepsize[chain] = stan_init_stepsize(
-            stepsize[chain],
-            metric[:, chain],
+    for chain in 1:size(positions, 2)
+        stepsize_adapter.stepsize[chain] = stan_init_stepsize(
+            sampler.stepsize[chain],
+            sampler.metric[:, chain],
             rngs[chain],
             ldg,
             positions[:, chain];
             kwargs...,
         )
     end
+
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
 function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
@@ -103,6 +115,7 @@ function initialize_stepsize!(
 )
     dims = size(positions, 1)
     stepsize_adapter.stepsize .= 2.38 / sqrt(dims) # TODO double check this number
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
 struct StepsizeInitializerMEADS end
@@ -125,28 +138,62 @@ function initialize_stepsize!(
 
         update!(stepsize_adapter, ldg, q, sigma, f; kwargs...)
     end
+    set!(sampler, stepsize_adapter; kwargs...)
 end
 
-# # TODO needs a second look
-# function init_stepsize!(::Val{:chees}, adapter, metric, rng, ldg, draws; kwargs...)
-#     T = eltype(draws[1][1][1])
-#     chains = length(draws[1])
-#     num_metrics = size(metrics, 2)
+struct StepsizeInitializerSGA end
 
-#     αs = zeros(T, chains)
-#     ε = 2 * one(T)
-#     harmonic_mean = zero(T)
-#     tmp = similar(draws[1][1])
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerSGA,
+    stepsize_adapter::StepsizeConstant,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+) end
 
-#     while harmonic_mean < oftype(x, 0.5)
-#         ε /= 2
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerSGA,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+)
+    T = eltype(stepsize_adapter)
+    num_chains = size(positions, 2)
 
-#         for (metric, chain) in zip(Iterators.cylce(1:metrics), 1:chains)
-#             # TODO keep, if this is needed. Otherwise, ditch. adapter.ε = ε
-#             # TODO info = hmc!()
-#             αs[chain] = info.acceptstat
-#         end
-#         harmonic_mean = inv(mean(inv, αs))
-#     end
-#     adapter.ε = ε
-# end
+    αs = zeros(T, num_chains)
+    stepsize = 2 * sampler.stepsize[1]
+    harmonic_mean = zero(T)
+    tmp = similar(positions)
+
+    metric = sampler.metric
+    num_metrics = size(metric, 2)
+    cycle_metrics = Iterators.cycle(1:num_metrics)
+
+    while harmonic_mean < oftype(harmonic_mean, 0.5)
+        stepsize /= 2
+        for (c, m) in zip(1:num_chains, cycle_metrics)
+            info = hmc!(
+                positions[:, c],
+                tmp[:, c],
+                ldg,
+                rngs[c],
+                sampler.dims,
+                metric[:, m],
+                stepsize,
+                1,
+                1000;
+                kwargs...,
+            )
+            αs[c] = info.acceptstat
+        end
+        harmonic_mean = inv(mean(inv, αs))
+    end
+
+    stepsize_adapter.stepsize .= stepsize
+    set!(sampler, stepsize_adapter; kwargs...)
+end

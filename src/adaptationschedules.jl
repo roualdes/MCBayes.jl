@@ -43,15 +43,20 @@ function adapt!(
     warmup = schedule.warmup
     if m <= warmup
         accept_stats = trace.acceptstat[m, :]
-        update!(stepsize_adapter, accept_stats; warmup, kwargs...)
+        update!(stepsize_adapter, accept_stats, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         # TODO(ear) this is attempting to plan ahead;
         # to actually use update!() will require
         # more arguments, for additional information on which
         # the trajectorylength could be learned; re SGA methods
-        update!(trajectorylength_adapter; kwargs...)
-        set!(sampler, trajectorylength_adapter; kwargs...)
+
+        # if m > trajectorylength_delay
+        #     update!(trajectorylength_adapter, m + 1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
+        #     set!(sampler, trajectorylength_adapter; kwargs...)
+        # end
+        # update!(trajectorylength_adapter; kwargs...)
+        # set!(sampler, trajectorylength_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
@@ -126,3 +131,86 @@ function adapt!(
         end
     end
 end
+
+struct SGAAdaptationSchedule
+    warmup::Int
+end
+
+function adapt!(
+    sampler,
+    schedule::SGAAdaptationSchedule,
+    trace,
+    m,
+    ldg,
+    draws,
+    rngs,
+    metric_adapter,
+    stepsize_initializer,
+    stepsize_adapter,
+    trajectorylength_adapter,
+    damping_adapter,
+    noise_adapter,
+    drift_adapter;
+    trajectorylength_delay=100,
+    kwargs...,
+)
+    warmup = schedule.warmup
+    if m <= warmup
+        T = eltype(trace.acceptstat)
+        accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m, :]]
+        accept_stats .+= 1e-20
+        abar = inv(mean(inv, accept_stats))
+
+        update!(stepsize_adapter, abar, m; warmup, kwargs...)
+        set!(sampler, stepsize_adapter; kwargs...)
+
+        if m > trajectorylength_delay
+            positions = draws[m, :, :]
+            update!(
+                trajectorylength_adapter,
+                m,
+                accept_stats,
+                positions,
+                trace.momentum,
+                trace.position,
+                sampler.stepsize[1];
+                kwargs...,
+            )
+            set!(sampler, trajectorylength_adapter; kwargs...)
+        end
+
+        @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+        w = m^-0.6    # TODO make an uniquely named keyword argument
+        metric_adapter.metric .=
+            w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
+        set!(sampler, metric_adapter; kwargs...)
+
+        # update!(pca_adapter, ...)
+        # set!(pca_adapter, ...)
+
+    else
+        set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
+        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
+    end
+end
+
+struct NoAdaptationSchedule end
+
+function adapt!(
+    sampler,
+    schedule::NoAdaptationSchedule,
+    trace,
+    m,
+    ldg,
+    draws,
+    rngs,
+    metric_adapter,
+    stepsize_initializer,
+    stepsize_adapter,
+    trajectorylength_adapter,
+    damping_adapter,
+    noise_adapter,
+    drift_adapter;
+    trajectorylength_delay=1000,
+    kwargs...,
+) end

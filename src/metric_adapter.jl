@@ -30,7 +30,7 @@ function optimum(mom::MetricOnlineMoments, args...; regularized=true, kwargs...)
     if mom.om.n[1] > 1
         v = if regularized
             w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
-            @. w * mom.om.v + (1 - w) * convert(T, 1e-3)
+            w .* mom.om.v .+ (1 .- w) .* convert(T, 1e-3)::T
         else
             mom.om.v
         end
@@ -86,7 +86,7 @@ function MetricFisherDivergence(initial_metric::AbstractMatrix{T}; kwargs...) wh
 end
 
 function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...; kwargs...)
-    grads = similar(mfd.metric)
+    grads = similar(x)
     for c in axes(grads, 2)
         _, grads[:, c] = ldg(x[:, c]; kwargs...)
     end
@@ -95,10 +95,10 @@ function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...; k
 end
 
 function optimum(mfd::MetricFisherDivergence, args...; kwargs...)
+    T = eltype(mfd.om.v)
     if mfd.om.n[1] > 1
         return sqrt.(mfd.om.v ./ mfd.og.v)
     else
-        T = eltype(mfd.om.m)
         return ones(T, size(mfd.om.v))
     end
 end
