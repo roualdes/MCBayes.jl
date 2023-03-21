@@ -157,13 +157,18 @@ function adapt!(
     warmup = schedule.warmup
     if m <= warmup
 
-        accept_stats = trace.acceptstat[m, :]
+        T = eltype(trace.acceptstat)
+        accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m, :]]
+        accept_stats .+= 1e-20
         abar = inv(mean(inv, accept_stats))
+
         update!(stepsize_adapter, abar, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         if m > trajectorylength_delay
-            update!(trajectorylength_adapter, m+1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
+            positions = draws[m, :, :]
+            update!(trajectorylength_adapter, m, accept_stats, positions,
+                    trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
             set!(sampler, trajectorylength_adapter; kwargs...)
         end
 

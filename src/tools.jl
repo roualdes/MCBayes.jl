@@ -25,7 +25,7 @@ function hmc!(
         position_next .= position
     end
 
-    return (; accepted, divergent, position, acceptstat=a, energy=H, momentum=p, stepsize, steps)
+    return (; accepted, divergent, stepsize, steps, acceptstat=a, energy=H, momentum=p, position=q)
 end
 
 function pghmc!(
@@ -152,7 +152,7 @@ function weighted_mean(x, w)
     return m
 end
 
-function centered_cumsum(f, x, mx = zero(x))
+function centered_sum(f, x, mx = zero(x))
     s = zero(eltype(f(first(x))))
     for n in eachindex(x, mx)
         s += f(x[n] - mx[n])
