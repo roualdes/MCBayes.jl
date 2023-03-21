@@ -25,7 +25,9 @@ function hmc!(
         position_next .= position
     end
 
-    return (; accepted, divergent, stepsize, steps, acceptstat=a, energy=H, momentum=p, position=q)
+    return (;
+        accepted, divergent, stepsize, steps, acceptstat=a, energy=H, momentum=p, position=q
+    )
 end
 
 function pghmc!(
@@ -78,7 +80,16 @@ function pghmc!(
         rand(rng, T)
     end
 
-    return (; accepted, divergence, energy, acceptstat=a > zero(a) ? one(a) : exp(a), noise, drift, damping, stepsize)
+    return (;
+        accepted,
+        divergence,
+        energy,
+        acceptstat=a > zero(a) ? one(a) : exp(a),
+        noise,
+        drift,
+        damping,
+        stepsize,
+    )
 end
 
 function rand_momentum(rng, dims, metric)
@@ -152,7 +163,7 @@ function weighted_mean(x, w)
     return m
 end
 
-function centered_sum(f, x, mx = zero(x))
+function centered_sum(f, x, mx=zero(x))
     s = zero(eltype(f(first(x))))
     for n in eachindex(x, mx)
         s += f(x[n] - mx[n])
@@ -160,7 +171,7 @@ function centered_sum(f, x, mx = zero(x))
     return s
 end
 
-function centered_dot(x, mx, y, my = zero(y))
+function centered_dot(x, mx, y, my=zero(y))
     s = zero(eltype(dot(first(x), first(y))))
     for n in eachindex(x, y)
         s += (x[n] - mx[n]) * (y[n] - my[n])

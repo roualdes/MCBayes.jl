@@ -9,7 +9,12 @@ struct ChEES{T} <: AbstractSGA{T}
 end
 
 function ChEES(
-    dims, chains=10, T=Float64; metric=ones(T, dims, 1), stepsize=ones(T, 1), trajectorylength=ones(T, 1)
+    dims,
+    chains=10,
+    T=Float64;
+    metric=ones(T, dims, 1),
+    stepsize=ones(T, 1),
+    trajectorylength=ones(T, 1),
 )
     D = convert(Int, dims)::Int
     return ChEES(metric, stepsize, trajectorylength, D, chains)
@@ -52,7 +57,12 @@ struct SNAPER{T} <: AbstractSGA{T}
 end
 
 function SNAPER(
-    dims, chains=10, T=Float64; metric=ones(T, dims, 1), stepsize=ones(T, 1), trajectorylength=ones(T, 1)
+    dims,
+    chains=10,
+    T=Float64;
+    metric=ones(T, dims, 1),
+    stepsize=ones(T, 1),
+    trajectorylength=ones(T, 1),
 )
     D = convert(Int, dims)::Int
     return SNAPER(metric, stepsize, trajectorylength, D, chains)
@@ -70,7 +80,7 @@ function sample!(
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
-    )
+)
     return run_sampler!(
         sampler,
         ldg;

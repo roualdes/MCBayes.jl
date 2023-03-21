@@ -23,8 +23,7 @@ function initialize_stepsize!(
     ldg,
     positions;
     kwargs...,
-    )
-end
+) end
 
 function initialize_stepsize!(
     initialzer::StepsizeInitializerStan,
@@ -34,8 +33,7 @@ function initialize_stepsize!(
     ldg,
     positions;
     kwargs...,
-    )
-
+)
     for chain in 1:size(positions, 2)
         stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             sampler.stepsize[chain],
@@ -153,10 +151,17 @@ function initialize_stepsize!(
     ldg,
     positions;
     kwargs...,
-    )
-end
+) end
 
-function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapter, sampler, rngs, ldg, positions; kwargs...)
+function initialize_stepsize!(
+    initialzer::StepsizeInitializerSGA,
+    stepsize_adapter,
+    sampler,
+    rngs,
+    ldg,
+    positions;
+    kwargs...,
+)
     T = eltype(stepsize_adapter)
     num_chains = size(positions, 2)
 
@@ -172,16 +177,18 @@ function initialize_stepsize!(initialzer::StepsizeInitializerSGA, stepsize_adapt
     while harmonic_mean < oftype(harmonic_mean, 0.5)
         stepsize /= 2
         for (c, m) in zip(1:num_chains, cycle_metrics)
-            info = hmc!(positions[:, c],
-                        tmp[:, c],
-                        ldg,
-                        rngs[c],
-                        sampler.dims,
-                        metric[:, m],
-                        stepsize,
-                        1,
-                        1000;
-                        kwargs...)
+            info = hmc!(
+                positions[:, c],
+                tmp[:, c],
+                ldg,
+                rngs[c],
+                sampler.dims,
+                metric[:, m],
+                stepsize,
+                1,
+                1000;
+                kwargs...,
+            )
             αs[c] = info.acceptstat
         end
         harmonic_mean = inv(mean(inv, αs))

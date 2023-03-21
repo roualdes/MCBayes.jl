@@ -52,6 +52,7 @@ function check_means(constrained_draws, true_means; z=5)
     err_m = reshape(mcse_mean(constrained_draws), :)
     l = length(true_means)
     if length(m) == l
+        # TODO write function for abs(m - E(m)) / err_m < z
         return all(m .- z .* err_m .< true_means .< m .+ z .* err_m)
     else
         l -= 1
@@ -84,8 +85,8 @@ modeldir = joinpath(artifact"test_models", "test_models")
 expectations = open(deserialize, joinpath(modeldir, "expectations.jls"))
 model_names = [f for f in readdir(modeldir) if isdir(joinpath(modeldir, f))]
 
-# include("rwm.jl")
+include("rwm.jl")
 include("stan.jl")
-# include("meads.jl")
-# include("mala.jl")
+include("meads.jl")
+include("mala.jl")
 include("chees.jl")

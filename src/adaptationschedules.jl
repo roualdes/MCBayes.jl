@@ -151,12 +151,11 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay = 100,
+    trajectorylength_delay=100,
     kwargs...,
-    )
+)
     warmup = schedule.warmup
     if m <= warmup
-
         T = eltype(trace.acceptstat)
         accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m, :]]
         accept_stats .+= 1e-20
@@ -167,14 +166,23 @@ function adapt!(
 
         if m > trajectorylength_delay
             positions = draws[m, :, :]
-            update!(trajectorylength_adapter, m, accept_stats, positions,
-                    trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
+            update!(
+                trajectorylength_adapter,
+                m,
+                accept_stats,
+                positions,
+                trace.momentum,
+                trace.position,
+                sampler.stepsize[1];
+                kwargs...,
+            )
             set!(sampler, trajectorylength_adapter; kwargs...)
         end
 
-        @views update!(metric_adapter, draws[m+1, :, :], ldg; kwargs...)
-        w = m ^ -0.6    # TODO make an uniquely named keyword argument
-        metric_adapter.metric .= w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
+        @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+        w = m^-0.6    # TODO make an uniquely named keyword argument
+        metric_adapter.metric .=
+            w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
         set!(sampler, metric_adapter; kwargs...)
 
         # update!(pca_adapter, ...)
@@ -203,7 +211,6 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay = 1000,
+    trajectorylength_delay=1000,
     kwargs...,
-    )
-end
+) end

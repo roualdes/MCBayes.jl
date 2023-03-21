@@ -65,9 +65,7 @@
         ldg = prepare_log_density_gradient(bsm)
 
         mala = MALA(dims)
-        draws, diagnostics, rngs = sample!(
-            mala, ldg; iterations=iterations, warmup=warmup
-        )
+        draws, diagnostics, rngs = sample!(mala, ldg; iterations=iterations, warmup=warmup)
 
         constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
