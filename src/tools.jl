@@ -1,34 +1,31 @@
 function hmc!(
-    integrator,
-    next_position,
-    position,
-    momenta,
-    ldg,
-    gradient,
-    stepsize,
-    steps,
-    maxdeltaH;
-    kwargs...,
+    position, position_next, ldg, rng, dims, metric, stepsize, steps, maxdeltaH; kwargs...
 )
-    # TODO(ear) needs updating to current interface
     T = eltype(position)
-    next_position .= position
+    q = copy(position)
+    p = randn(rng, T, dims)
 
-    lp, gradient = ldg(position; kwargs...)
-    H1 = hamiltonian(lp, momenta)
-    isnan(H1) && (H1 = typemin(T))
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
 
-    integrate!(ldg, position, momenta, gradient, stepsize, steps; kwargs...)
+    ld, gradient = leapfrog!(
+        q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
+    )
 
-    H2 = hamiltonian(lp, momenta)
-    isnan(H2) && (H2 = typemin(T))
-    divergent = divergence(H2, H1, maxdeltaH)
+    H = hamiltonian(ld, p)
+    isnan(H) && (H = typemax(T))
+    divergent = (H - H0) > maxdeltaH
 
-    a = min(1, exp(H1 + H2))
+    a = min(1, exp(H0 - H))
     accepted = rand(rng, T) < a
-    accepted && (next_position .= position)
+    if accepted
+        position_next .= q
+    else
+        position_next .= position
+    end
 
-    return (; accepted, divergent, acceptstat=a)
+    return (; accepted, divergent, acceptstat=a, energy=H)
 end
 
 function pghmc!(

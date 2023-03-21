@@ -1,26 +1,27 @@
-abstract type AbstractMH{T} <: AbstractSampler{T} end
+abstract type AbstractRWM{T} <: AbstractSampler{T} end
 
-struct MH{T} <: AbstractMH{T}
+struct RWM{T} <: AbstractRWM{T}
     metric::Matrix{T}
     stepsize::Vector{T}
     dims::Int
     chains::Int
 end
 
-function MH(
+function RWM(
     dims, chains=4, T=Float64; metric=ones(T, dims, chains), stepsize=ones(T, chains)
 )
     D = convert(Int, dims)::Int
-    return MH(metric, stepsize, D, chains)
+    return RWM(metric, stepsize, D, chains)
 end
 
 function sample!(
-    sampler::MH,
+    sampler::RWM,
     ld;
     iterations=5000,
     warmup=iterations,
-    draws_initializer=:mh,
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; initializer=:mh, δ=0.3),
+    draws_initializer=DrawsInitializerRWM(),
+    stepsize_initializer=StepsizeInitializerRWM(),
+    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.3),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
@@ -31,6 +32,7 @@ function sample!(
         iterations,
         warmup,
         draws_initializer,
+        stepsize_initializer,
         stepsize_adapter,
         metric_adapter,
         adaptation_schedule,
@@ -38,12 +40,12 @@ function sample!(
     )
 end
 
-function transition!(sampler::MH, m, ld, draws, rngs, trace; kwargs...)
+function transition!(sampler::RWM, m, ld, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
     @sync for it in 1:nt
         Threads.@spawn for chain in it:nt:chains
-            @views info = mh_kernel!(
+            @views info = rwm_kernel!(
                 draws[m, :, chain],
                 draws[m + 1, :, chain],
                 rngs[chain],
@@ -58,7 +60,7 @@ function transition!(sampler::MH, m, ld, draws, rngs, trace; kwargs...)
     end
 end
 
-function mh_kernel!(position, position_next, rng, dims, metric, stepsize, ld; kwargs...)
+function rwm_kernel!(position, position_next, rng, dims, metric, stepsize, ld; kwargs...)
     T = eltype(position)
     position_next .= position .+ randn(rng, T, dims) .* stepsize .* sqrt.(metric)
     a = exp(ld(copy(position_next); kwargs...) - ld(copy(position); kwargs...))

@@ -1,3 +1,28 @@
+mutable struct WindowedAdaptationSchedule
+    closewindow::Int
+    windowsize::Int
+    const warmup::Int
+    const firstwindow::Int
+    const lastwindow::Int
+end
+
+function WindowedAdaptationSchedule(warmup; initbuffer=75, termbuffer=50, windowsize=25)
+    # TODO probably want some reasonable checks on warmup values
+    return WindowedAdaptationSchedule(
+        initbuffer + windowsize, windowsize, warmup, initbuffer, warmup - termbuffer
+    )
+end
+
+function calculate_nextwindow!(ws::WindowedAdaptationSchedule)
+    ws.windowsize *= 2
+    nextclosewindow = ws.closewindow + ws.windowsize
+    return ws.closewindow = if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
+        ws.lastwindow
+    else
+        min(nextclosewindow, ws.lastwindow)
+    end
+end
+
 function adapt!(
     sampler,
     schedule::WindowedAdaptationSchedule,
@@ -7,6 +32,7 @@ function adapt!(
     draws,
     rngs,
     metric_adapter,
+    stepsize_initializer,
     stepsize_adapter,
     trajectorylength_adapter,
     damping_adapter,
@@ -33,7 +59,13 @@ function adapt!(
 
         if m == schedule.closewindow
             @views initialize_stepsize!(
-                stepsize_adapter, sampler, rngs, ldg, draws[m + 1, :, :]; kwargs...
+                stepsize_initializer,
+                stepsize_adapter,
+                sampler,
+                rngs,
+                ldg,
+                draws[m + 1, :, :];
+                kwargs...,
             )
             set!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter; kwargs...)
@@ -48,6 +80,8 @@ function adapt!(
     end
 end
 
+struct EnsembleChainSchedule end
+
 function adapt!(
     sampler,
     schedule::EnsembleChainSchedule,
@@ -57,6 +91,7 @@ function adapt!(
     draws,
     rngs,
     metric_adapter,
+    stepsize_initializer,
     stepsize_adapter,
     trajectorylength_adapter,
     damping_adapter,

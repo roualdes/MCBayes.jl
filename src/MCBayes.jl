@@ -8,13 +8,10 @@ abstract type AbstractSampler{T<:AbstractFloat} end
 
 Base.eltype(::AbstractSampler{T}) where {T} = T
 
-struct EnsembleChainSchedule end
-
-include("windowedadaptation.jl")
+include("adaptationschedules.jl")
 include("dualaverage.jl")
 include("adam.jl")
 include("onlinemoments.jl")
-include("adapt.jl")
 
 include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
@@ -23,13 +20,14 @@ include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
 
-include("initialize_sampler.jl")
-include("initialize_draws.jl")
-include("initialize_stepsize.jl")
+include("sampler_initializer.jl")
+include("draws_initializer.jl")
+include("stepsize_initializer.jl")
 
 include("stan.jl")
-include("mh.jl")
+include("rwm.jl")
 include("meads.jl")
+include("mala.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -39,12 +37,22 @@ include("trace.jl")
 include("convergence.jl")
 
 export Stan,
-    MH,
+    RWM,
     MEADS,
+    MALA,
+    StepsizeInitializer,
+    StepsizeInitializerStan,
+    StepsizeInitializerMEADS,
+    StepsizeInitializerRWM,
+    DrawsInitializer,
+    DrawsInitializerStan,
+    DrawsInitializerRWM,
+    DrawsInitializerAdam,
     OnlineMoments,
     MetricOnlineMoments,
     MetricConstant,
     MetricECA,
+    MetricFisherDivergence,
     StepsizeAdam,
     StepsizeDualAverage,
     StepsizeConstant,
@@ -58,13 +66,13 @@ export Stan,
     NoiseECA,
     NoiseConstant,
     sample!,
-    # ess_bulk, # wait until https://github.com/JuliaLang/julia/pull/47040
+    # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
     ess_quantile,
     ess_mean,
     ess_sq,
     ess_std,
-    # rhat,  # wait until https://github.com/JuliaLang/julia/pull/47040
+    # rhat,  # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     rhat_basic,
     mcse_mean,
     mcse_std
@@ -85,7 +93,8 @@ function run_sampler!(
     rngs=Random.Xoshiro.(
         rand(1:typemax(Int), hasfield(typeof(sampler), :chains) ? sampler.chains : 4)
     ),
-    draws_initializer=:stan,
+    draws_initializer=DrawsInitializer(),
+    stepsize_initializer=StepsizeInitializer(),
     stepsize_adapter=StepsizeConstant(
         hasfield(typeof(sampler), :stepsize) ? sampler.stepsize : ones(1)
     ),
@@ -124,7 +133,13 @@ function run_sampler!(
     initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
 
     @views initialize_stepsize!(
-        stepsize_adapter, sampler, rngs, ldg, draws[1, :, :]; kwargs...
+        stepsize_initializer,
+        stepsize_adapter,
+        sampler,
+        rngs,
+        ldg,
+        draws[1, :, :];
+        kwargs...,
     )
     set!(sampler, stepsize_adapter; kwargs...)
 
@@ -140,6 +155,7 @@ function run_sampler!(
             draws,
             rngs,
             metric_adapter,
+            stepsize_initializer,
             stepsize_adapter,
             trajectorylength_adapter,
             damping_adapter,
@@ -156,12 +172,15 @@ function ldg(x; kwargs...)
     -x' * x / 2, -x
 end
 
-stan = Stan(10, 4)
+stan = Stan(10)
 draws, diagnostics, rngs = sample!(stan, ldg)
 ess_mean(draws)
 rhat_basic(draws)
 
 meads = MEADS(10)
 draws, diagnostics, rngs = sample!(meads, ldg)
+
+mala = MALA(10)
+draws, diagnostics, rngs = sample!(mala, ldg)
 
 end

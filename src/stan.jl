@@ -35,7 +35,8 @@ function sample!(
     ldg;
     iterations=1000,
     warmup=iterations,
-    draws_initializer=:stan,
+    draws_initializer=DrawsInitializerStan(),
+    stepsize_initializer=StepsizeInitializerStan(),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
@@ -47,6 +48,7 @@ function sample!(
         iterations,
         warmup,
         draws_initializer,
+        stepsize_initializer,
         stepsize_adapter,
         metric_adapter,
         adaptation_schedule,
