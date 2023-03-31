@@ -63,9 +63,10 @@ end
 function rwm_kernel!(position, position_next, rng, dims, metric, stepsize, ld; kwargs...)
     T = eltype(position)
     position_next .= position .+ randn(rng, T, dims) .* stepsize .* sqrt.(metric)
-    a = exp(ld(copy(position_next); kwargs...) - ld(copy(position); kwargs...))
+    ld = ld(copy(position_next); kwargs...)
+    a = exp(ld - ld(copy(position); kwargs...))
     acceptstat = min(1, a)
     accepted = rand(rng, T) < acceptstat
     position_next .= position_next .* accepted .+ position .* (1 - accepted)
-    return (; accepted, acceptstat, stepsize)
+    return (; accepted, acceptstat, stepsize, ld)
 end

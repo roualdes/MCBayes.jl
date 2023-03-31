@@ -26,16 +26,17 @@
 # https://github.com/JuliaLang/julia/pull/47040
 # and the related PR
 # https://github.com/JuliaLang/Pkg.jl/pull/3216
-# function autocovariance(x)
-#     N = length(x)
-#     Mt2 = 2 * fft_nextgoodsize(N)
-#     yc = x .- mean(x)
-#     append!(yc, repeat([0.0], Mt2 - N))
-#     t = bfft(yc)
-#     ac = bfft(conj(t) .* t)
-#     return real(ac)[1:N] ./ (N * N * 2)
-# end
-# until then here's a O(N^2) implementation
+function _autocovariance(x)
+    N = length(x)
+    Mt2 = 2 * _fft_nextgoodsize(N)
+    yc = x .- mean(x)
+    append!(yc, repeat([0.0], Mt2 - N))
+    t = bfft(yc)
+    ac = bfft(conj(t) .* t)
+    return real(ac)[1:N] ./ (N * N * 2)
+end
+
+# here's an O(N^2) implementation
 function autocovariance(x)
     N = length(x)
     xc = x .- (sum(x) / N)

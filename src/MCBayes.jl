@@ -28,6 +28,7 @@ include("stan.jl")
 include("rwm.jl")
 include("meads.jl")
 include("mala.jl")
+include("malt.jl")
 include("sga.jl")
 
 include("tools.jl")
@@ -41,6 +42,7 @@ export Stan,
     RWM,
     MEADS,
     MALA,
+    MALT,
     ChEES,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
@@ -67,10 +69,12 @@ export Stan,
     TrajectorylengthConstant,
     TrajectorylengthChEES,
     DampingECA,
+    DampingMALT,
     DampingConstant,
     DriftECA,
     DriftConstant,
     NoiseECA,
+    NoiseMALT,
     NoiseConstant,
     sample!,
     # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040

@@ -1,3 +1,28 @@
+function malt!(
+    position, position_next, ldg, rng, dims, metric, stepsize, steps, noise, maxdeltaH; kwargs...
+)
+    T = eltype(position)
+    q = copy(position)
+    p = randn(rng, T, dims)
+
+    Δ, ld = langevin_trajectory!(
+        q, p, ldg, stepsize .* sqrt.(metric), steps, noise; kwargs...
+    )
+    divergent = -Δ > maxdeltaH
+
+    a = min(1, exp(Δ))
+    accepted = rand(rng, T) < a
+    if accepted
+        position_next .= q
+    else
+        position_next .= position
+    end
+
+    return (;
+        accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p), 
+    )
+end
+
 function hmc!(
     position, position_next, ldg, rng, dims, metric, stepsize, steps, maxdeltaH; kwargs...
 )
@@ -26,7 +51,7 @@ function hmc!(
     end
 
     return (;
-        accepted, divergent, stepsize, steps, acceptstat=a, energy=H, momentum=p, position=q
+        accepted, divergent, stepsize, steps, ld, acceptstat=a, energy=H, momentum=p, position=q
     )
 end
 
@@ -81,19 +106,28 @@ function pghmc!(
     end
 
     return (;
-        accepted,
-        divergence,
-        energy,
-        acceptstat=a > zero(a) ? one(a) : exp(a),
-        noise,
-        drift,
-        damping,
-        stepsize,
+            accepted,
+            divergence,
+            energy,
+            noise,
+            drift,
+            damping,
+            stepsize,
+            ld,
+            acceptstat=a > zero(a) ? one(a) : exp(a),
+
     )
 end
 
 function rand_momentum(rng, dims, metric)
     return randn(rng, eltype(metric), dims) ./ sqrt.(metric)
+end
+
+function langevin_trajectory_energy_difference(position_previous, ld_previous, gradient_previous, position, ld, gradient, stepsize)
+    one = ld - ld_previous
+    two = 0.5 * dot(position .- position_previous, gradient .+ gradient_previous)
+    three = (sum(abs2, stepsize .* gradient) - sum(abs2, stepsize .* gradient_previous)) / 8
+    return one - two + three
 end
 
 function hamiltonian(ld, momenta, metric)

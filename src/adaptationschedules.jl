@@ -46,18 +46,6 @@ function adapt!(
         update!(stepsize_adapter, accept_stats, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
-        # TODO(ear) this is attempting to plan ahead;
-        # to actually use update!() will require
-        # more arguments, for additional information on which
-        # the trajectorylength could be learned; re SGA methods
-
-        # if m > trajectorylength_delay
-        #     update!(trajectorylength_adapter, m + 1, accept_stats, draws, trace.momentum, trace.position, sampler.stepsize[1]; kwargs...)
-        #     set!(sampler, trajectorylength_adapter; kwargs...)
-        # end
-        # update!(trajectorylength_adapter; kwargs...)
-        # set!(sampler, trajectorylength_adapter; kwargs...)
-
         if schedule.firstwindow <= m <= schedule.lastwindow
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
@@ -76,12 +64,34 @@ function adapt!(
             reset!(stepsize_adapter; kwargs...)
 
             set!(sampler, metric_adapter; kwargs...)
+
+            update!(damping_adapter, sampler.metric; kwargs...)
+            set!(sampler, damping_adapter; kwargs...)
+
+            if :damping in fieldnames(typeof(sampler))
+                update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+                set!(sampler, noise_adapter; kwargs...)
+            end
+
             reset!(metric_adapter)
 
             calculate_nextwindow!(schedule)
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
+    end
+
+    if m == warmup
+        if :damping in fieldnames(typeof(sampler))
+            update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+            set!(sampler, noise_adapter; kwargs...)
+        end
+
+        halfwarmup = div(warmup, 2)
+        idx = halfwarmup:warmup
+        lds = draws[idx, :, :]
+        update!(trajectorylength_adapter, sampler.stepsize, lds, length(idx); kwargs...)
+        set!(sampler, trajectorylength_adapter; kwargs...)
     end
 end
 

@@ -91,7 +91,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
         end
 
         if stepsize > 1e7
-            throw("Posterior is impropoer.  Please check your model.")
+            throw("Posterior is improper.  Please check your model.")
         end
         if stepsize <= 0.0
             throw(
