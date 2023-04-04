@@ -15,7 +15,7 @@ end
 # constructors, as it conflates where I want the defaults to be set.
 # I want the API to set the defaults in the adapters.
 function MALT(
-    dims, chains=4, T=Float64; metric=ones(T, dims, chains), stepsize=ones(T, chains), trajectorylength=ones(T, chains)
+    dims, chains=4, T=Float64; metric=ones(T, dims, chains), stepsize=ones(T, chains), trajectorylength=ones(T, 1)
     )
     damping = ones(T, chains)
     noise = exp.(-0.5 .* damping .* stepsize)
@@ -32,7 +32,7 @@ function sample!(
     stepsize_initializer=StepsizeInitializerStan(),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.65),
     metric_adapter=MetricOnlineMoments(sampler.metric),
-    trajectorylength_adapter = TrajectorylengthMCHMC(sampler.trajectorylength),
+    trajectorylength_adapter = TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
     damping_adapter = DampingMALT(sampler.damping),
     noise_adapter = NoiseMALT(sampler.noise),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
@@ -61,8 +61,10 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
     @sync for it in 1:nt
         Threads.@spawn for chain in it:nt:chains
             stepsize = sampler.stepsize[chain]
-            trajectorylength = sampler.trajectorylength[chain]
-            steps = min(max(1, ceil(Int, trajectorylength)), 100)
+            trajectorylength = sampler.trajectorylength[1]
+            steps = max(1, ceil(Int, 2 * halton(m) * trajectorylength / stepsize))
+            println("steps = $steps")
+            # steps = max(1, ceil(Int, trajectorylength / stepsize))
             noise = sampler.noise[chain]
             @views info = malt!(
                 draws[m, :, chain],

@@ -38,6 +38,7 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
+    trajectorylength_delay=100,
     kwargs...,
 )
     warmup = schedule.warmup
@@ -48,6 +49,24 @@ function adapt!(
 
         if schedule.firstwindow <= m <= schedule.lastwindow
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+        end
+
+        if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
+            accept_stats .+= 1e-20
+            abar = inv(mean(inv, accept_stats))
+            positions = draws[m, :, :]
+            
+            update!(
+                trajectorylength_adapter,
+                m,
+                accept_stats,
+                positions,
+                trace.momentum,
+                trace.position,
+                inv(mean(inv, sampler.stepsize));
+                kwargs...,
+            )
+            set!(sampler, trajectorylength_adapter; kwargs...)
         end
 
         if m == schedule.closewindow
@@ -79,19 +98,7 @@ function adapt!(
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-    end
-
-    if m == warmup
-        if :damping in fieldnames(typeof(sampler))
-            update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
-            set!(sampler, noise_adapter; kwargs...)
-        end
-
-        halfwarmup = div(warmup, 2)
-        idx = halfwarmup:warmup
-        lds = draws[idx, :, :]
-        update!(trajectorylength_adapter, sampler.stepsize, lds, length(idx); kwargs...)
-        set!(sampler, trajectorylength_adapter; kwargs...)
+        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
 

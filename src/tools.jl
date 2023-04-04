@@ -19,7 +19,8 @@ function malt!(
     end
 
     return (;
-        accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p), 
+            accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p),
+            momentum=p, position=q,
     )
 end
 

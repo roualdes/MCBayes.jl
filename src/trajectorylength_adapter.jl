@@ -129,32 +129,3 @@ end
 function update!(tlc::TrajectorylengthConstant, args...; kwargs...) end
 
 function reset!(tlc::TrajectorylengthConstant, args...; kwargs...) end
-
-
-struct TrajectorylengthMCHMC{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
-    trajectorylength::Vector{T}
-    trajectorylength_bar::Vector{T}
-end
-
-function TrajectorylengthMCHMC(initial_trajectorylength::AbstractVector; kwargs...)
-    return TrajectorylengthMCHMC(initial_trajectorylength, initial_trajectorylength)
-end
-
-function update!(tlmchmc::TrajectorylengthMCHMC, stepsize, lds, n, args...;
-                 trajectorylength_coefficient = 0.4, kwargs...)
-    neff = mean(ess_mean(lds))
-    any(isnan.(neff)) && (neff .= div(n, 2))
-    tlmchmc.trajectorylength .= trajectorylength_coefficient .* n ./ neff
-    tlmchmc.trajectorylength_bar .= tlmchmc.trajectorylength
-end
-
-function set!(sampler, tlmchmc::TrajectorylengthMCHMC, args...; kwargs...)
-    if :trajectorylength in fieldnames(typeof(sampler))
-        sampler.trajectorylength .= tlmchmc.trajectorylength
-    end
-end
-
-function reset!(tlmchmc::TrajectorylengthMCHMC, args...; kwargs...)
-    tlmmchmc.trajectorylength .= 0
-    tlmmchmc.trajectorylength_bar .= 0
-end
