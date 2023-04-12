@@ -52,10 +52,12 @@ function adapt!(
         end
 
         if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
+            T = eltype(accept_stats)
+            accept_stats .= [isnan(as) ? zero(T) : as for as in accept_stats]
             accept_stats .+= 1e-20
             abar = inv(mean(inv, accept_stats))
             positions = draws[m, :, :]
-            
+
             update!(
                 trajectorylength_adapter,
                 m,
@@ -63,7 +65,7 @@ function adapt!(
                 positions,
                 trace.momentum,
                 trace.position,
-                inv(mean(inv, sampler.stepsize));
+                mean(sampler.stepsize);
                 kwargs...,
             )
             set!(sampler, trajectorylength_adapter; kwargs...)

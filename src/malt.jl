@@ -15,7 +15,7 @@ end
 # constructors, as it conflates where I want the defaults to be set.
 # I want the API to set the defaults in the adapters.
 function MALT(
-    dims, chains=4, T=Float64; metric=ones(T, dims, chains), stepsize=ones(T, chains), trajectorylength=ones(T, 1)
+    dims, chains=12, T=Float64; metric=ones(T, dims, chains), stepsize=ones(T, chains), trajectorylength=ones(T, 1)
     )
     damping = ones(T, chains)
     noise = exp.(-0.5 .* damping .* stepsize)

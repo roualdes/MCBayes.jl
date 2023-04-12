@@ -26,20 +26,19 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
     for step in 1:steps
         momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
         ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
-        momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
 
-        ed = langevin_trajectory_energy_difference(position_previous,
-                                                   ld_previous,
-                                                   gradient_previous,
-                                                   position,
-                                                   ld,
-                                                   gradient,
-                                                   stepsize)
-        if isnan(ed)
+        energy_difference = langevin_trajectory_energy_difference(position_previous,
+                                                                  ld_previous,
+                                                                  gradient_previous,
+                                                                  position,
+                                                                  ld,
+                                                                  gradient,
+                                                                  stepsize)
+        if isnan(energy_difference)
             Δ = typemin(T)
             break
         end
-        Δ += ed
+        Δ += energy_difference
 
         position_previous .= position
         ld_previous = ld
