@@ -1,4 +1,3 @@
-# TODO(ear) use z::PSPoint instead of position, momentum?
 function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...)
     ld = zero(eltype(position))
     @. momentum += stepsize * gradient / 2
@@ -19,31 +18,24 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
     T = eltype(position)
     Δ = zero(T)
     ld = zero(T)
-    ld_previous, gradient = ldg(position; kwargs...)
-    position_previous = copy(position)
-    gradient_previous = copy(gradient)
+    ld_original, gradient = ldg(position; kwargs...)
+    momentum_previous = copy(momentum)
 
     for step in 1:steps
         momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
         ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
 
-        energy_difference = langevin_trajectory_energy_difference(position_previous,
-                                                                  ld_previous,
-                                                                  gradient_previous,
-                                                                  position,
-                                                                  ld,
-                                                                  gradient,
-                                                                  stepsize)
+        energy_difference = (momentum_previous' * momentum_previous - momentum' * momentum) / 2
         if isnan(energy_difference)
             Δ = typemin(T)
             break
         end
         Δ += energy_difference
 
-        position_previous .= position
-        ld_previous = ld
-        gradient_previous .= gradient
+        momentum_previous .= momentum
     end
+
+    Δ += ld - ld_original
 
     return Δ, ld
 end

@@ -61,7 +61,7 @@ end
 # TODO(ear) smooth damping_bar with some exponential weighting of the
 # noisy estimates of metric
 function update!(dmalt::DampingMALT, metric, args...; damping_coefficient = 1.5, kwargs...)
-    dmalt.damping .= damping_coefficient ./ maximum(metric, dims = 1)[:]
+    dmalt.damping .= damping_coefficient ./ sqrt.(maximum(metric, dims = 1)[:])
     dmalt.damping_bar .= dmalt.damping
 end
 

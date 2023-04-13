@@ -51,25 +51,25 @@ function adapt!(
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
 
-        if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
-            T = eltype(accept_stats)
-            accept_stats .= [isnan(as) ? zero(T) : as for as in accept_stats]
-            accept_stats .+= 1e-20
-            abar = inv(mean(inv, accept_stats))
-            positions = draws[m, :, :]
+        # if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
+        #     T = eltype(accept_stats)
+        #     accept_stats .= [isnan(as) ? zero(T) : as for as in accept_stats]
+        #     accept_stats .+= 1e-20
+        #     abar = inv(mean(inv, accept_stats))
+        #     positions = draws[m, :, :]
 
-            update!(
-                trajectorylength_adapter,
-                m,
-                accept_stats,
-                positions,
-                trace.momentum,
-                trace.position,
-                mean(sampler.stepsize);
-                kwargs...,
-            )
-            set!(sampler, trajectorylength_adapter; kwargs...)
-        end
+        #     update!(
+        #         trajectorylength_adapter,
+        #         m,
+        #         accept_stats,
+        #         positions,
+        #         trace.momentum,
+        #         trace.position,
+        #         mean(sampler.stepsize);
+        #         kwargs...,
+        #     )
+        #     set!(sampler, trajectorylength_adapter; kwargs...)
+        # end
 
         if m == schedule.closewindow
             @views initialize_stepsize!(
@@ -86,13 +86,13 @@ function adapt!(
 
             set!(sampler, metric_adapter; kwargs...)
 
-            update!(damping_adapter, sampler.metric; kwargs...)
-            set!(sampler, damping_adapter; kwargs...)
+            # update!(damping_adapter, sampler.metric; kwargs...)
+            # set!(sampler, damping_adapter; kwargs...)
 
-            if :damping in fieldnames(typeof(sampler))
-                update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
-                set!(sampler, noise_adapter; kwargs...)
-            end
+            # if :damping in fieldnames(typeof(sampler))
+            #     update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+            #     set!(sampler, noise_adapter; kwargs...)
+            # end
 
             reset!(metric_adapter)
 
@@ -100,7 +100,7 @@ function adapt!(
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
+        # set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
 
@@ -204,9 +204,16 @@ function adapt!(
             w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
         set!(sampler, metric_adapter; kwargs...)
 
+        update!(damping_adapter, sampler.metric; kwargs...)
+        set!(sampler, damping_adapter; kwargs...)
+
+        if :damping in fieldnames(typeof(sampler))
+            update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+            set!(sampler, noise_adapter; kwargs...)
+        end
+
         # update!(pca_adapter, ...)
         # set!(pca_adapter, ...)
-
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
         set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
