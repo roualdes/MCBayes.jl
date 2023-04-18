@@ -30,7 +30,7 @@ function sample!(
     warmup=iterations,
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerSGA(),
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.65),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     trajectorylength_adapter = TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
     damping_adapter = DampingMALT(sampler.damping),
@@ -63,7 +63,7 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
             stepsize = sampler.stepsize[1]
             trajectorylength = sampler.trajectorylength[1]
             steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
-            # println("steps = $steps")
+            println("stepsize = $stepsize")
             noise = sampler.noise[1]
             @views info = malt!(
                 draws[m, :, chain],

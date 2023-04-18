@@ -25,17 +25,14 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
         momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
         ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
 
-        energy_difference = (momentum_previous' * momentum_previous - momentum' * momentum) / 2
-        if isnan(energy_difference)
-            Δ = typemin(T)
-            break
-        end
-        Δ += energy_difference
-
+        Δ += (momentum_previous' * momentum_previous - momentum' * momentum) / 2
         momentum_previous .= momentum
     end
 
     Δ += ld - ld_original
+    if isnan(Δ)
+        Δ = typemax(T)
+    end
 
     return Δ, ld
 end

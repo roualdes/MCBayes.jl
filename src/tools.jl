@@ -8,9 +8,10 @@ function malt!(
     Δ, ld = langevin_trajectory!(
         q, p, ldg, stepsize .* sqrt.(metric), steps, noise; kwargs...
     )
-    divergent = Δ > maxdeltaH
+    divergent = -Δ > maxdeltaH
 
-    accepted = randexp(rng, T) < Δ
+    a = min(1, exp(Δ))
+    accepted = rand(rng, T) < a
     if accepted
         position_next .= q
     else
@@ -18,7 +19,7 @@ function malt!(
     end
 
     return (;
-            accepted, divergent, stepsize, steps, noise, ld, acceptstat=exp(-max(0, Δ)), energy=hamiltonian(ld, p),
+            accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p),
             momentum=p, position=q,
     )
 end
@@ -36,7 +37,7 @@ function hmc!(
 
     ld, gradient = leapfrog!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
-    )
+            )
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
