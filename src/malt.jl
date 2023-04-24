@@ -63,7 +63,6 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
             stepsize = sampler.stepsize[1]
             trajectorylength = sampler.trajectorylength[1]
             steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
-            println("stepsize = $stepsize")
             noise = sampler.noise[1]
             @views info = malt!(
                 draws[m, :, chain],
@@ -75,7 +74,7 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
                 stepsize,
                 steps,
                 noise,
-                1000,
+                1000;
                 kwargs...,
             )
             info = (; info..., trajectorylength, damping = sampler.damping[1])

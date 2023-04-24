@@ -199,12 +199,12 @@ function adapt!(
         end
 
         @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
-        w = m^-0.6    # TODO make an uniquely named keyword argument
+        w = m ^ -0.6    # TODO make an uniquely named keyword argument
         metric_adapter.metric .=
             w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
         set!(sampler, metric_adapter; kwargs...)
 
-        update!(damping_adapter, sampler.metric; kwargs...)
+        update!(damping_adapter, m, sampler.metric; kwargs...)
         set!(sampler, damping_adapter; kwargs...)
 
         if :damping in fieldnames(typeof(sampler))

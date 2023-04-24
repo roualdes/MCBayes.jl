@@ -19,7 +19,11 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
     Δ = zero(T)
     ld = zero(T)
     ld_original, gradient = ldg(position; kwargs...)
+    isnan(ld_original) && (ld_original = typemax(T))
+    # H0 = hamiltonian(ld_original, momentum_previous)
+    # isnan(H0) && (H0 = typemax(T))
     momentum_previous = copy(momentum)
+
 
     for step in 1:steps
         momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
@@ -29,10 +33,10 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
         momentum_previous .= momentum
     end
 
-    Δ += ld - ld_original
-    if isnan(Δ)
-        Δ = typemax(T)
-    end
+    isnan(ld) && (ld = typemax(T))
+    # H = hamiltonian(ld, momentum)
+    # isnan(H) && (H = typemax(T))
+    Δ += ld - ld_original # H0 - H #
 
     return Δ, ld
 end
