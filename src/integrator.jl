@@ -14,16 +14,11 @@ function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...
     return ld, gradient
 end
 
-function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; kwargs...)
+function langevin_trajectory!(position, momentum, ldg, gradient, stepsize, steps, noise; kwargs...)
     T = eltype(position)
     Δ = zero(T)
     ld = zero(T)
-    ld_original, gradient = ldg(position; kwargs...)
-    isnan(ld_original) && (ld_original = typemax(T))
-    # H0 = hamiltonian(ld_original, momentum_previous)
-    # isnan(H0) && (H0 = typemax(T))
     momentum_previous = copy(momentum)
-
 
     for step in 1:steps
         momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
@@ -32,11 +27,6 @@ function langevin_trajectory!(position, momentum, ldg, stepsize, steps, noise; k
         Δ += (momentum_previous' * momentum_previous - momentum' * momentum) / 2
         momentum_previous .= momentum
     end
-
-    isnan(ld) && (ld = typemax(T))
-    # H = hamiltonian(ld, momentum)
-    # isnan(H) && (H = typemax(T))
-    Δ += ld - ld_original # H0 - H #
 
     return Δ, ld
 end

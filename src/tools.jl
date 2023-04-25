@@ -5,9 +5,15 @@ function malt!(
     q = copy(position)
     p = randn(rng, T, dims)
 
+    ld0, gradient = ldg(q; kwargs...)
+    isnan(ld0) && (ld0 = typemin(T))
+
     Δ, ld = langevin_trajectory!(
-        q, p, ldg, stepsize .* sqrt.(metric), steps, noise; kwargs...
-    )
+        q, p, ldg, gradient, stepsize .* sqrt.(metric), steps, noise; kwargs...
+            )
+
+    isnan(ld) && (H = typemin(T))
+    Δ += ld - ld0
     divergent = -Δ > maxdeltaH
 
     a = min(1, exp(Δ))
