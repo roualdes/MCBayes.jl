@@ -5,18 +5,18 @@ function malt!(
     q = copy(position)
     p = randn(rng, T, dims)
 
-    ld0, gradient = ldg(q; kwargs...)
-    isnan(ld0) && (ld0 = typemin(T))
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
 
-    Δ, ld = langevin_trajectory!(
+    H, ld = langevin_trajectory!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps, noise; kwargs...
             )
 
-    isnan(ld) && (H = typemin(T))
-    Δ += ld - ld0
-    divergent = -Δ > maxdeltaH
+    isnan(H) && (H = typemax(T))
+    divergent = H - H0 > maxdeltaH
 
-    a = min(1, exp(Δ))
+    a = min(1, exp(H0 - H))
     accepted = rand(rng, T) < a
     if accepted
         position_next .= q
@@ -128,13 +128,6 @@ end
 
 function rand_momentum(rng, dims, metric)
     return randn(rng, eltype(metric), dims) ./ sqrt.(metric)
-end
-
-function langevin_trajectory_energy_difference(position_previous, ld_previous, gradient_previous, position, ld, gradient, stepsize)
-    one = ld - ld_previous
-    two = 0.5 * dot(position .- position_previous, gradient .+ gradient_previous)
-    three = (sum(abs2, stepsize .* gradient) - sum(abs2, stepsize .* gradient_previous)) / 8
-    return one - two + three
 end
 
 function hamiltonian(ld, momenta, metric)

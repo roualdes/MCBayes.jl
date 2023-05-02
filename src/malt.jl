@@ -58,13 +58,14 @@ end
 function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
+    stepsize = sampler.stepsize[1]
+    trajectorylength = sampler.trajectorylength[1]
+    steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
+    metric = sampler.metric[:, 1]
+    metric ./= maximum(metric)
+    noise = sampler.noise[1]
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
-            stepsize = sampler.stepsize[1]
-            trajectorylength = sampler.trajectorylength[1]
-            steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
-            metric = sampler.metric[:, 1]
-            noise = sampler.noise[1]
             @views info = malt!(
                 draws[m, :, chain],
                 draws[m + 1, :, chain],

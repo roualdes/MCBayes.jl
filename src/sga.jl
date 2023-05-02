@@ -104,8 +104,8 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
     steps = max(1, ceil(Int, 2 * halton(m) * trajectorylength / stepsize))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
-    @sync for it in 1:nt
-        Threads.@spawn for chain in it:nt:chains
+    Threads.@threads for it in 1:nt
+        for chain in it:nt:chains
             @views info = hmc!(
                 draws[m, :, chain],
                 draws[m + 1, :, chain],
