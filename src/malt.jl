@@ -19,7 +19,7 @@ function MALT(
     )
     D = convert(Int, dims)::Int
     damping = ones(T, 1)
-    noise = exp.(-0.5 .* damping .* stepsize)
+    noise = ones(T, 1)
     return MALT(metric, stepsize, trajectorylength, damping, noise, D, chains)
 end
 

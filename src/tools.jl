@@ -5,18 +5,18 @@ function malt!(
     q = copy(position)
     p = randn(rng, T, dims)
 
-    ld, gradient = ldg(q; kwargs...)
-    H0 = hamiltonian(ld, p)
-    isnan(H0) && (H0 = typemax(T))
+    ld0, gradient = ldg(q; kwargs...)
+    isnan(ld0) && (ld0 = typemin(T))
 
-    H, ld = langevin_trajectory!(
+    Δ, ld = langevin_trajectory!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps, noise; kwargs...
             )
 
-    isnan(H) && (H = typemax(T))
-    divergent = H - H0 > maxdeltaH
+    isnan(ld) && (ld = typemin(T))
+    Δ += ld - ld0
+    divergent = -Δ > maxdeltaH
 
-    a = min(1, exp(H0 - H))
+    a = min(1, exp(Δ))
     accepted = rand(rng, T) < a
     if accepted
         position_next .= q
