@@ -23,7 +23,7 @@ determines whether or not any updates will actually be applied.
 OnlineMoments(d, c=1) = OnlineMoments(Float64, d, c)
 
 """
-    update!(om::OnlineMoments, x::Matrix; kwargs...)
+    update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
 
 Update om's mean and variance `Matrix`es with the data contained in x.
 The rows of x and om.m (and thus om.v) must match.  The columns of x

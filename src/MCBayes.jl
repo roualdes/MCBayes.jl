@@ -12,6 +12,7 @@ include("adaptationschedules.jl")
 include("dualaverage.jl")
 include("adam.jl")
 include("onlinemoments.jl")
+include("onlinepca.jl")
 
 include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
@@ -57,6 +58,8 @@ export Stan,
     DrawsInitializerRWM,
     DrawsInitializerAdam,
     OnlineMoments,
+    OnlinePCA,
+    update!,
     MetricOnlineMoments,
     MetricConstant,
     MetricECA,
@@ -156,6 +159,9 @@ function run_sampler!(
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
 
+        # TODO move adapt! into transition;
+        # adaptations effectively should be unique to each algorithm
+        # adaptation schedules don't generalize well
         adapt!(
             sampler,
             adaptation_schedule,
