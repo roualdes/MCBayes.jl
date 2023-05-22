@@ -1,3 +1,10 @@
+# Adapted from
+# [1] https://arxiv.org/pdf/2110.11576.pdf
+# [2] https://proceedings.mlr.press/v130/hoffman21a.html
+# [3] https://github.com/tensorflow/probability/blob/c678caa1b8e94ab3677a37e581e8b19e68e59248/tensorflow_probability/python/experimental/mcmc/gradient_based_trajectory_length_adaptation.py
+# [4] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/sga_hmc.py
+# [5] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/fun_mc_lib.py
+
 abstract type AbstractTrajectorylengthAdapter{T} end
 
 Base.eltype(::AbstractTrajectorylengthAdapter{T}) where {T} = T
@@ -12,46 +19,21 @@ function set!(sampler, tla::AbstractTrajectorylengthAdapter, args...; kwargs...)
     end
 end
 
-"""
-# Adapted from
-# [1] https://arxiv.org/pdf/2110.11576.pdf
-# [2] https://proceedings.mlr.press/v130/hoffman21a.html
-# [3] https://github.com/tensorflow/probability/blob/c678caa1b8e94ab3677a37e581e8b19e68e59248/tensorflow_probability/python/experimental/mcmc/gradient_based_trajectory_length_adaptation.py
-# [4] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/sga_hmc.py
-# [5] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/fun_mc_lib.py
-"""
-struct TrajectorylengthChEES{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
-    adam::Adam{T}
-    om::OnlineMoments{T}
-    trajectorylength::Vector{T}
-    trajectorylength_bar::Vector{T}
-    maxleapfrogsteps::Int
-end
-
-function TrajectorylengthChEES(
-    initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
-) where {T}
-    adam = Adam(1, T; kwargs...)
-    om = OnlineMoments(T, dims, 1)
-    return TrajectorylengthChEES(
-        adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
-    )
-end
-
 function update!(
-    tlc::TrajectorylengthChEES,
+    tla::AbstractTrajectorylengthAdapter,
     m,
     αs,
     positions,
     ps,
     qs,
     stepsize,
+    r,
     args...;
     γ=-0.6,
     kwargs...,
 )
-    update!(tlc.om, positions; kwargs...)
-    ghats = trajectorylength_gradient(tlc, m, αs, positions, ps, qs, stepsize)
+    update!(tla.om, positions; kwargs...)
+    ghats = trajectorylength_gradient(tla, m, αs, positions, ps, qs, stepsize, r)
 
     αbar = inv(mean(inv, αs))
     if αbar < 1e-4 || !all(isfinite.(ghats)) # [3]#L733
@@ -59,21 +41,21 @@ function update!(
     end
 
     ghat = weighted_mean(ghats, αs)
-    as = update!(tlc.adam, ghat, m; kwargs...)[1]
+    as = update!(tla.adam, ghat, m; kwargs...)[1]
 
     logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
-    T = tlc.trajectorylength[1] * exp(logupdate)     # [3]#L761
-    T = clamp(T, 0, stepsize * tlc.maxleapfrogsteps) # [3]#L773
+    T = tla.trajectorylength[1] * exp(logupdate)     # [3]#L761
+    T = clamp(T, 0, stepsize * tla.maxleapfrogsteps) # [3]#L773
 
-    tlc.trajectorylength[1] = T
+    tla.trajectorylength[1] = T
     aw = m^γ
-    tlc.trajectorylength_bar[1] = exp(
-        aw * log(T) + (1 - aw) * log(1e-10 + tlc.trajectorylength_bar[1])
+    tla.trajectorylength_bar[1] = exp(
+        aw * log(T) + (1 - aw) * log(1e-10 + tla.trajectorylength_bar[1])
     )
 end
 
 function trajectorylength_gradient(
-    tla::AbstractTrajectorylengthAdapter, m, αs, positions, ps, qs, stepsize
+    tla::AbstractTrajectorylengthAdapter, m, αs, positions, ps, qs, stepsize, r
 )
     dims, chains = size(positions)
 
@@ -95,16 +77,34 @@ function trajectorylength_gradient(
     @. meanq = mw * tla.om.m + (1 - mw) * meanq
 
     ghats = sampler_trajectorylength_gradient(
-        tla, m, positions, ps, qs, stepsize, meanθ, meanq
+        tla, m, positions, ps, qs, stepsize, meanθ, meanq, r
     )
     return ghats
 end
 
+struct TrajectorylengthChEES{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    adam::Adam{T}
+    om::OnlineMoments{T}
+    trajectorylength::Vector{T}
+    trajectorylength_bar::Vector{T}
+    maxleapfrogsteps::Int
+end
+
+function TrajectorylengthChEES(
+    initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
+) where {T}
+    adam = Adam(1, T; kwargs...)
+    om = OnlineMoments(T, dims, 1)
+    return TrajectorylengthChEES(
+        adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+    )
+end
+
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthChEES, m, positions, ps, qs, stepsize, mθ, mq
+    tlc::TrajectorylengthChEES, m, positions, ps, qs, stepsize, mθ, mq, r
 )
     t = tlc.trajectorylength[1] + stepsize
-    h = 1 # halton(m)
+    h = halton(m)
     T = eltype(positions)
     dims, chains = size(positions)
     ghats = zeros(chains)
@@ -112,6 +112,79 @@ function sampler_trajectorylength_gradient(
         q = qs[:, chain]
         dsq = centered_sum(abs2, q, mq) - centered_sum(abs2, positions[:, chain], mθ)
         ghats[chain] = 4 * dsq * centered_dot(q, mq, ps[:, chain]) - dsq^2 / t
+        ghats[chain] *= h
+    end
+    return ghats
+end
+
+struct TrajectorylengthMALT{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    adam::Adam{T}
+    om::OnlineMoments{T}
+    trajectorylength::Vector{T}
+    trajectorylength_bar::Vector{T}
+    maxleapfrogsteps::Int
+end
+
+function TrajectorylengthMALT(
+    initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
+) where {T}
+    adam = Adam(1, T; kwargs...)
+    om = OnlineMoments(T, dims, 1)
+    return TrajectorylengthMALT(
+        adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+    )
+end
+
+function sampler_trajectorylength_gradient(
+    tlc::TrajectorylengthMALT, m, positions, ps, qs, stepsize, mθ, mq, r
+)
+    t = tlc.trajectorylength[1] + stepsize
+    T = eltype(positions)
+    dims, chains = size(positions)
+    ghats = zeros(chains)
+    @views for chain in 1:chains
+        # q = qs[:, chain]
+        # dsq = centered_sum(abs2, q, mq) - centered_sum(abs2, positions[:, chain], mθ)
+        # ghats[chain] = 4 * dsq * centered_dot(q, mq, ps[:, chain]) - dsq^2 / t
+        q = qs[:, chain]
+        tmp = centered_dot(q, mq, r)
+        dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
+        ghats[chain] = 4 * dsq * tmp * dot(ps[:, chain], r) - dsq^2 / t
+    end
+    return ghats
+end
+
+struct TrajectorylengthSNAPER{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    adam::Adam{T}
+    om::OnlineMoments{T}
+    trajectorylength::Vector{T}
+    trajectorylength_bar::Vector{T}
+    maxleapfrogsteps::Int
+end
+
+function TrajectorylengthSNAPER(
+    initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
+) where {T}
+    adam = Adam(1, T; kwargs...)
+    om = OnlineMoments(T, dims, 1)
+    return TrajectorylengthMALT(
+        adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+    )
+end
+
+function sampler_trajectorylength_gradient(
+    tlc::TrajectorylengthSNAPER, m, positions, ps, qs, stepsize, mθ, mq, r
+)
+    t = tlc.trajectorylength[1] + stepsize
+    h = halton(m)
+    T = eltype(positions)
+    dims, chains = size(positions)
+    ghats = zeros(chains)
+    @views for chain in 1:chains
+        q = qs[:, chain]
+        tmp = centered_dot(q, mq, r)
+        dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
+        ghats[chain] = 4 * dsq * tmp * dot(ps[:, chain], r) - dsq^2 / t
         ghats[chain] *= h
     end
     return ghats
