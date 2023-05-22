@@ -34,11 +34,11 @@ function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
         l = opca.l
 
         if nv == 1
-            opca.pc .= u
+            opca.pc .= x[:, chain]
         else
-            f = (nv - 1 - l) .* opca.pc ./ nv
-            s = (1 + l) .* u .* (u' * opca.pc) ./ nv
-            opca.pc .= f .+ s ./ norm(opca.pc)
+            f = ((nv - 1 - l) / nv) .* opca.pc
+            s = ((1 + l) / nv) .* u .* (u' * opca.pc) ./ norm(opca.pc)
+            opca.pc .= f .+ s
         end
     end
 
