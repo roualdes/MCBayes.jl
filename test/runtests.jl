@@ -7,6 +7,7 @@ using LinearAlgebra
 BLAS.set_num_threads(1)
 
 include("test_onlinemoments.jl")
+include("test_onlinepca.jl")
 include("test_pspoint.jl")
 include("test_typestability.jl")
 include("test_convergence.jl")
