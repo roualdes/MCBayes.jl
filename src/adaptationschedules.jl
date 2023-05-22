@@ -220,7 +220,8 @@ function adapt!(
                 trace.momentum,
                 trace.position,
                 sampler.stepsize[1],
-                sampler.pca;
+                sampler.pca,
+                ldg;
                 kwargs...,
             )
             set!(sampler, trajectorylength_adapter; kwargs...)
