@@ -199,7 +199,7 @@ function adapt!(
 
         if :pca in fieldnames(typeof(sampler))
             update!(pca_adapter, positions ./ sqrt.(metric); kwargs...)
-            pca_adapter.pc .= w .* optimum(pca_adapter; kwargs...) .+ (1 - w) .* (sampler.pca)
+            pca_adapter.pc .= w .* optimum(pca_adapter; kwargs...) .+ (1 - w) .* sampler.pca
             set!(sampler, pca_adapter; kwargs...)
 
             update!(damping_adapter, m, sampler.stepsize, sqrt(norm(sampler.pca)); kwargs...)

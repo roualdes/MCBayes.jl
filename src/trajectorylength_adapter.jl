@@ -144,13 +144,18 @@ function sampler_trajectorylength_gradient(
     dims, chains = size(positions)
     ghats = zeros(chains)
     @views for chain in 1:chains
+        # ChEES
         # q = qs[:, chain]
         # dsq = centered_sum(abs2, q, mq) - centered_sum(abs2, positions[:, chain], mθ)
         # ghats[chain] = 4 * dsq * centered_dot(q, mq, ps[:, chain]) - dsq^2 / t
+        # SNAPER
         q = qs[:, chain]
         tmp = centered_dot(q, mq, r)
         dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
-        ghats[chain] = 4 * dsq * tmp * dot(ps[:, chain], r) - dsq^2 / t
+        fd = 2 * tmp * dsq * dot(ps[:, chain], r)
+        fd2 = 2 * tmp * -dsq * dot(ps[:, chain], -r)
+        ghats[chain] = 2 * (fd + fd2) - dsq^2 / t
+
     end
     return ghats
 end
@@ -185,7 +190,9 @@ function sampler_trajectorylength_gradient(
         q = qs[:, chain]
         tmp = centered_dot(q, mq, r)
         dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
-        ghats[chain] = 2 * dsq * tmp * dot(ps[:, chain], r) - dsq^2 / t
+        fd = 2 * tmp * dsq * dot(ps[:, chain], r)
+        fd2 = 2 * tmp * -dsq * dot(ps[:, chain], -r)
+        ghats[chain] = 2 * (fd + fd2) - dsq^2 / t
         ghats[chain] *= h
     end
     return ghats
