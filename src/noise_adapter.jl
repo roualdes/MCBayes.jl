@@ -65,10 +65,8 @@ function NoiseMALT(initial_noise::AbstractVector; kwargs...)
     return NoiseMALT(initial_noise, initial_noise)
 end
 
-# TODO(ear) smooth noise_bar with some exponential weighting of the noisy
-# estimates of sigma_max -> damping = 1.5 / sigma_max is noisy
 function update!(nmalt::NoiseMALT, damping, stepsize, args...; kwargs...)
-    nmalt.noise .= exp.(-0.5 .* damping .* stepsize)
+    nmalt.noise .= exp.(-damping)
     nmalt.noise_bar .= nmalt.noise
 end
 

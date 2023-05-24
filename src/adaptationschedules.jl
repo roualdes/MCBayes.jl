@@ -32,12 +32,14 @@ function adapt!(
     draws,
     rngs,
     metric_adapter,
+    pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
     trajectorylength_adapter,
     damping_adapter,
     noise_adapter,
     drift_adapter;
+    trajectorylength_delay=100,
     kwargs...,
 )
     warmup = schedule.warmup
@@ -49,6 +51,26 @@ function adapt!(
         if schedule.firstwindow <= m <= schedule.lastwindow
             @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
+
+        # if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
+        #     T = eltype(accept_stats)
+        #     accept_stats .= [isnan(as) ? zero(T) : as for as in accept_stats]
+        #     accept_stats .+= 1e-20
+        #     abar = inv(mean(inv, accept_stats))
+        #     positions = draws[m, :, :]
+
+        #     update!(
+        #         trajectorylength_adapter,
+        #         m,
+        #         accept_stats,
+        #         positions,
+        #         trace.momentum,
+        #         trace.position,
+        #         mean(sampler.stepsize);
+        #         kwargs...,
+        #     )
+        #     set!(sampler, trajectorylength_adapter; kwargs...)
+        # end
 
         if m == schedule.closewindow
             @views initialize_stepsize!(
@@ -65,13 +87,13 @@ function adapt!(
 
             set!(sampler, metric_adapter; kwargs...)
 
-            update!(damping_adapter, sampler.metric; kwargs...)
-            set!(sampler, damping_adapter; kwargs...)
+            # update!(damping_adapter, sampler.metric; kwargs...)
+            # set!(sampler, damping_adapter; kwargs...)
 
-            if :damping in fieldnames(typeof(sampler))
-                update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
-                set!(sampler, noise_adapter; kwargs...)
-            end
+            # if :damping in fieldnames(typeof(sampler))
+            #     update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+            #     set!(sampler, noise_adapter; kwargs...)
+            # end
 
             reset!(metric_adapter)
 
@@ -79,19 +101,7 @@ function adapt!(
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-    end
-
-    if m == warmup
-        if :damping in fieldnames(typeof(sampler))
-            update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
-            set!(sampler, noise_adapter; kwargs...)
-        end
-
-        halfwarmup = div(warmup, 2)
-        idx = halfwarmup:warmup
-        lds = draws[idx, :, :]
-        update!(trajectorylength_adapter, sampler.stepsize, lds, length(idx); kwargs...)
-        set!(sampler, trajectorylength_adapter; kwargs...)
+        # set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
 
@@ -106,6 +116,7 @@ function adapt!(
     draws,
     rngs,
     metric_adapter,
+    pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
     trajectorylength_adapter,
@@ -155,6 +166,7 @@ function adapt!(
     draws,
     rngs,
     metric_adapter,
+    pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
     trajectorylength_adapter,
@@ -174,8 +186,32 @@ function adapt!(
         update!(stepsize_adapter, abar, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
+        positions = draws[m, :, :]
+        update!(metric_adapter, positions, ldg; kwargs...)
+        w = m ^ -0.6    # TODO make an uniquely named keyword argument
+        # TODO this pattern could use some structure: ExponentialDecayAverage, a struct EDA or at least a method
+        metric_adapter.metric .=
+            w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
+        set!(sampler, metric_adapter; kwargs...)
+
+        metric = sampler.metric[:, 1]
+        metric ./= maximum(metric)
+
+        if :pca in fieldnames(typeof(sampler))
+            update!(pca_adapter, positions ./ sqrt.(metric); kwargs...)
+            pca_adapter.pc .= w .* optimum(pca_adapter; kwargs...) .+ (1 - w) .* sampler.pca
+            set!(sampler, pca_adapter; kwargs...)
+
+            update!(damping_adapter, m, sampler.stepsize, sqrt(norm(sampler.pca)); kwargs...)
+            set!(sampler, damping_adapter; kwargs...)
+        end
+
+        if :damping in fieldnames(typeof(sampler))
+            update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+            set!(sampler, noise_adapter; kwargs...)
+        end
+
         if m > trajectorylength_delay
-            positions = draws[m, :, :]
             update!(
                 trajectorylength_adapter,
                 m,
@@ -183,21 +219,13 @@ function adapt!(
                 positions,
                 trace.momentum,
                 trace.position,
-                sampler.stepsize[1];
+                sampler.stepsize[1],
+                sampler.pca,
+                ldg;
                 kwargs...,
             )
             set!(sampler, trajectorylength_adapter; kwargs...)
         end
-
-        @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
-        w = m^-0.6    # TODO make an uniquely named keyword argument
-        metric_adapter.metric .=
-            w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
-        set!(sampler, metric_adapter; kwargs...)
-
-        # update!(pca_adapter, ...)
-        # set!(pca_adapter, ...)
-
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
         set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)

@@ -99,6 +99,7 @@ end
 
 function trace(sampler::MALT{T}, iterations) where {T}
     chains = sampler.chains
+    dims = sampler.dims
     return (;
             acceptstat=zeros(T, iterations, chains),
             accepted=zeros(Bool, iterations, chains),
@@ -109,7 +110,10 @@ function trace(sampler::MALT{T}, iterations) where {T}
             noise=zeros(T, iterations, chains),
             trajectorylength=zeros(T, iterations, chains),
             ld=zeros(T, iterations, chains),
-    )
+            momentum=zeros(T, dims, chains),
+            position=zeros(T, dims, chains)
+)
+
 end
 
 function record!(sampler::MALT{T}, trace::NamedTuple, info, iteration, chain) where {T}
@@ -119,20 +123,22 @@ function record!(sampler::MALT{T}, trace::NamedTuple, info, iteration, chain) wh
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:momentum][:, chain] .= info[:momentum]
+    trace[:position][:, chain] .= info[:position]
 end
 
 function trace(sampler::AbstractSGA{T}, iterations) where {T}
     chains = sampler.chains
     dims = sampler.dims
     return (;
-        acceptstat=zeros(T, iterations, chains),
-        accepted=zeros(Bool, iterations, chains),
-        divergence=zeros(Bool, iterations, chains),
-        energy=zeros(T, iterations, chains),
-        momentum=zeros(T, dims, chains),
-        position=zeros(T, dims, chains),
-        stepsize=zeros(T, iterations, 1),
-        steps=zeros(Int, iterations, 1),
+            acceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            momentum=zeros(T, dims, chains),
+            position=zeros(T, dims, chains),
+            stepsize=zeros(T, iterations, 1),
+            steps=zeros(Int, iterations, 1),
             trajectorylength=zeros(T, iterations, 1),
             ld=zeros(T, iterations, chains),
     )
