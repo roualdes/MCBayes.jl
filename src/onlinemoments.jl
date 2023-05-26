@@ -7,6 +7,8 @@ struct OnlineMoments{T<:AbstractFloat}
     v::Matrix{T}
 end
 
+Base.eltype(::OnlineMoments{T}) where {T} = T
+
 # TODO T should come last to be more like Adam
 function OnlineMoments(T, d, c)
     return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
