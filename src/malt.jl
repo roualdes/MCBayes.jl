@@ -63,7 +63,8 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
     chains = size(draws, 3)
     stepsize = sampler.stepsize[1]
     trajectorylength = sampler.trajectorylength[1]
-    steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
+    steps = trajectorylength / stepsize
+    steps = convert(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     noise = sampler.noise[1]
