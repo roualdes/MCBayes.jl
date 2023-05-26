@@ -17,6 +17,7 @@ include("onlinepca.jl")
 include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
 include("metric_adapter.jl")
+include("pca_adapter.jl")
 include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
@@ -45,6 +46,7 @@ export Stan,
     MALA,
     MALT,
     ChEES,
+    SNAPER,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
@@ -57,9 +59,7 @@ export Stan,
     DrawsInitializerStan,
     DrawsInitializerRWM,
     DrawsInitializerAdam,
-    OnlineMoments,
-    OnlinePCA,
-    update!,
+    PCAOnline,
     MetricOnlineMoments,
     MetricConstant,
     MetricECA,
@@ -71,6 +71,8 @@ export Stan,
     TrajectorylengthAdam,
     TrajectorylengthConstant,
     TrajectorylengthChEES,
+    TrajectorylengthSNAPER,
+    TrajectorylengthLDG,
     DampingECA,
     DampingMALT,
     DampingConstant,
@@ -117,6 +119,9 @@ function run_sampler!(
     ),
     metric_adapter=MetricConstant(
         hasfield(typeof(sampler), :metric) ? sampler.metric : ones(1)
+    ),
+    pca_adapter=PCAConstant(
+        hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1)
     ),
     damping_adapter=DampingConstant(
         hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)
@@ -171,6 +176,7 @@ function run_sampler!(
             draws,
             rngs,
             metric_adapter,
+            pca_adapter,
             stepsize_initializer,
             stepsize_adapter,
             trajectorylength_adapter,

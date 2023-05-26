@@ -19,9 +19,11 @@ function langevin_trajectory!(position, momentum, ldg, gradient, stepsize, steps
     Δ = zero(T)
     ld = zero(T)
     momentum_previous = copy(momentum)
+    ξ = similar(momentum)
 
     for step in 1:steps
-        momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, size(momentum))
+        randn!(ξ)
+        momentum .= noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* ξ
         ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
 
         Δ += (momentum_previous' * momentum_previous - momentum' * momentum) / 2

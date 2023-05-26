@@ -1,3 +1,4 @@
+# adapted from https://www.cse.msu.edu/~weng/research/CCIPCApami.pdf
 struct OnlinePCA{T<:AbstractFloat}
     l::T
     n::Vector{Int}
@@ -12,7 +13,7 @@ end
 OnlinePCA(d, l = 2.0) = OnlinePCA(Float64, d, l)
 
 function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
-    # TODO fill in from https://www.cse.msu.edu/~weng/research/CCIPCApami.pdf
+
     dims, chains = size(x)
     d = length(opca.m)
 
@@ -43,4 +44,10 @@ function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
     end
 
     opca.n[1] += chains
+end
+
+function reset!(opca::OnlinePCA; kwargs...)
+    opca.n .= 0
+    opca.m .= 0
+    opca.pc .= 0
 end

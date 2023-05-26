@@ -2,6 +2,7 @@ abstract type AbstractMALT{T} <: AbstractSampler{T} end
 
 struct MALT{T} <: AbstractMALT{T}
     metric::Matrix{T}
+    pca::Vector{T}
     stepsize::Vector{T}
     trajectorylength::Vector{T}
     damping::Vector{T}
@@ -15,12 +16,12 @@ end
 # constructors, as it conflates where I want the defaults to be set.
 # I want the API to set the defaults in the adapters.
 function MALT(
-    dims, chains=12, T=Float64; metric=ones(T, dims, 1), stepsize=ones(T, 1), trajectorylength=ones(T, 1)
+    dims, chains=12, T=Float64; metric=ones(T, dims, 1), pca=zeros(T, dims), stepsize=ones(T, 1), trajectorylength=ones(T, 1)
     )
     D = convert(Int, dims)::Int
     damping = ones(T, 1)
     noise = ones(T, 1)
-    return MALT(metric, stepsize, trajectorylength, damping, noise, D, chains)
+    return MALT(metric, pca, stepsize, trajectorylength, damping, noise, D, chains)
 end
 
 function sample!(
@@ -32,7 +33,8 @@ function sample!(
     stepsize_initializer=StepsizeInitializerSGA(),
     stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
-    trajectorylength_adapter = TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
+    pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
+    trajectorylength_adapter = TrajectorylengthMALT(sampler.trajectorylength, sampler.dims),
     damping_adapter = DampingMALT(sampler.damping),
     noise_adapter = NoiseMALT(sampler.noise),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
@@ -47,6 +49,7 @@ function sample!(
         stepsize_initializer,
         stepsize_adapter,
         metric_adapter,
+        pca_adapter,
         trajectorylength_adapter,
         damping_adapter,
         noise_adapter,
@@ -60,7 +63,8 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
     chains = size(draws, 3)
     stepsize = sampler.stepsize[1]
     trajectorylength = sampler.trajectorylength[1]
-    steps = ceil(Int64, clamp(trajectorylength / stepsize, 1, 1000))
+    steps = trajectorylength / stepsize
+    steps = convert(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     noise = sampler.noise[1]
