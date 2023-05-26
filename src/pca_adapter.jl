@@ -22,7 +22,7 @@ PCAOnline(dims; kwargs...) = PCAOnline(Float64, dims; kwargs...)
 function update!(pca::PCAOnline{T}, x::AbstractMatrix, args...; pca_smooth = true, kwargs...) where {T}
     update!(pca.opca, x; kwargs...)
     w = pca.alpha + (1 - pca_smooth) * (1 - pca.alpha)
-    pca.pc .= w .* pca.opca .+ (1 - w) .* pca.pc
+    pca.pc .= w .* pca.opca.pc .+ (1 - w) .* pca.pc
 end
 
 function reset!(pca::PCAOnline, args...; kwargs...)

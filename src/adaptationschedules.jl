@@ -186,7 +186,7 @@ function adapt!(
         update!(stepsize_adapter, abar, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
-        positions = draws[m, :, :]
+        positions = draws[m+1, :, :]
         update!(metric_adapter, positions, ldg; kwargs...)
         set!(sampler, metric_adapter; kwargs...)
 
@@ -194,8 +194,7 @@ function adapt!(
         metric ./= maximum(metric)
 
         if :pca in fieldnames(typeof(sampler))
-            # TODO update!(pca_adapter, ... ) should assume centering
-            update!(pca_adapter, positions ./ sqrt.(metric); kwargs...)
+            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ sqrt.(metric); kwargs...)
             set!(sampler, pca_adapter; kwargs...)
 
             update!(damping_adapter, m, sampler.stepsize, sqrt(norm(sampler.pca)); kwargs...)
@@ -212,7 +211,7 @@ function adapt!(
                 trajectorylength_adapter,
                 m,
                 accept_stats,
-                positions,
+                draws[m, :, :]
                 trace.momentum,
                 trace.position,
                 sampler.stepsize[1],

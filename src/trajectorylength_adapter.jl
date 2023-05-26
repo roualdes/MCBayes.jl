@@ -44,12 +44,13 @@ function update!(
     ghat = weighted_mean(ghats, αs)
     as = update!(tla.adam, ghat, m; kwargs...)[1]
 
-    logupdate = clamp(as, -0.35, 0.35)               # [3]#L759
-    T = tla.trajectorylength[1] * exp(logupdate)     # [3]#L761
-    T = clamp(T, 0, stepsize * tla.maxleapfrogsteps) # [3]#L773
+    logupdate = clamp(as, -0.35, 0.35)           # [3]#L759
+    T = tla.trajectorylength[1] * exp(logupdate) # [3]#L761
+    T = min(T, stepsize * tla.maxleapfrogsteps)  # [3]#L773
 
     tla.trajectorylength[1] = T
-    aw = m^γ
+    aw = 1 - 8/9                # TODO add this as an argument to the constructor
+    # TODO and then re-design like OnlineMoments
     tla.trajectorylength_bar[1] = exp(
         aw * log(T) + (1 - aw) * log(1e-10 + tla.trajectorylength_bar[1])
     )
@@ -94,7 +95,7 @@ end
 function TrajectorylengthChEES(
     initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
 ) where {T}
-    adam = Adam(1, T; kwargs...)
+    adam = Adam(1, T; α = 0.01, kwargs...)
     om = OnlineMoments(T, dims, 1)
     return TrajectorylengthChEES(
         adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
@@ -131,7 +132,7 @@ end
 function TrajectorylengthMALT(
     initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
 ) where {T}
-    adam = Adam(1, T; kwargs...)
+    adam = Adam(1, T; α = 0.01, kwargs...)
     om = OnlineMoments(T, dims, 1)
     return TrajectorylengthMALT(
         adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
@@ -175,7 +176,7 @@ end
 function TrajectorylengthSNAPER(
     initial_trajectorylength::AbstractVector{T}, dims; maxleapfrogsteps=1000, kwargs...
 ) where {T}
-    adam = Adam(1, T; kwargs...)
+    adam = Adam(1, T; α = 0.01, kwargs...)
     om = OnlineMoments(T, dims, 1)
     return TrajectorylengthMALT(
         adam, om, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
