@@ -104,10 +104,14 @@ end
 function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
+    u = halton(m)
     trajectorylength = sampler.trajectorylength[1]
+    tld = get(kwargs, :trajectorylength_distribution, :uniform)
+    trajectorylength = tld == :uniform ? 2u * trajectorylength : -log(u) * trajectorylength
     stepsize = sampler.stepsize[1]
     steps = trajectorylength / stepsize
-    steps = round(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
+    steps = isfinite(steps) ? steps : 1
+    steps = round(Int64, clamp(steps, 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     Threads.@threads for it in 1:nt
