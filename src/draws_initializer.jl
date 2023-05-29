@@ -1,8 +1,8 @@
 struct DrawsInitializer end
 
-function initialize_draws!(initializer::DrawsInitializer, draws, rngs, ldg; kwargs...)
+function initialize_draws!(initializer::DrawsInitializer, draws, args...; kwargs...)
     if haskey(kwargs, :initial_draw)
-        draws[1, :, :] .= initial_draw
+        draws[1, :, :] .= kwargs[:initial_draw]
     else
         _, dims, chains = size(draws)
         error(
@@ -83,7 +83,7 @@ function initialize_draws!(
 
     @sync for it in 1:number_threads
         Threads.@spawn for chain in it:number_threads:chains
-            adm = Adam(dims, T; kwargs...)
+            adm = Adam(dims, 100, T; kwargs...)
             for s in 1:adam_steps
                 q = draws[1, :, chain]
                 ld, gradient = ldg(q; kwargs...)

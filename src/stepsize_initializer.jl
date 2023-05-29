@@ -191,7 +191,7 @@ function initialize_stepsize!(
             )
             αs[c] = info.acceptstat
         end
-        harmonic_mean = inv(mean(inv, αs))
+        harmonic_mean = mean(αs) # inv(mean(inv, αs))
     end
 
     stepsize_adapter.stepsize .= stepsize

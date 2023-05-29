@@ -11,7 +11,7 @@ end
 
 function ChEES(
     dims,
-    chains=10,
+    chains=12,
     T=Float64;
     metric=ones(T, dims, 1),
     stepsize=ones(T, 1),
@@ -26,10 +26,10 @@ function sample!(
     ldg;
     iterations=2000,
     warmup=iterations,
-    draws_initializer=DrawsInitializerStan(),
+    draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
-    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
-    trajectorylength_adapter=TrajectorylengthChEES(sampler.trajectorylength, sampler.dims),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
+    trajectorylength_adapter=TrajectorylengthChEES(sampler.trajectorylength, sampler.dims, warmup),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
     kwargs...,
@@ -76,10 +76,10 @@ function sample!(
     ldg;
     iterations=2000,
     warmup=iterations,
-    draws_initializer=DrawsInitializerStan(),
+    draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
-    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
-    trajectorylength_adapter=TrajectorylengthSNAPER(sampler.trajectorylength, sampler.dims),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
+    trajectorylength_adapter=TrajectorylengthSNAPER(sampler.trajectorylength, sampler.dims, warmup),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
     adaptation_schedule=SGAAdaptationSchedule(warmup),

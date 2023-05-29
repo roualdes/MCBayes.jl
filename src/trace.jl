@@ -106,6 +106,7 @@ function trace(sampler::MALT{T}, iterations) where {T}
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),
             stepsize=zeros(T, iterations, chains),
+            steps=zeros(Int, iterations, 1),
             damping=zeros(T, iterations, chains),
             noise=zeros(T, iterations, chains),
             trajectorylength=zeros(T, iterations, chains),
@@ -123,6 +124,7 @@ function record!(sampler::MALT{T}, trace::NamedTuple, info, iteration, chain) wh
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:steps][iteration] = info[:steps]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
 end
