@@ -5,6 +5,7 @@
            0.5   -0.16   1.36   0.63]
     U = cholesky(C).U
     m = [5.84; 3.06; 3.78; 1.22]
+    pca = [-0.88; 0.31; -0.36; -0.03]
 
     N = 5_000
     dims = length(m)
@@ -20,32 +21,34 @@
 
     x = mvrandn(N, m, U)
 
-    opca = OnlinePCA(dims);
+    opca = MCBayes.OnlinePCA(dims)
+    om = MCBayes.OnlineMoments(dims, 1)
     for n in axes(x, 2)
-        update!(opca, reshape(x[:, n], :, 1))
+        y = reshape(x[:, n], :, 1)
+        MCBayes.update!(om, y)
+        MCBayes.update!(opca, y .- om.m)
     end
 
     @test opca.n[1] == N
-    @test isapprox(opca.m, mean(x, dims = 2))
 
-    pca = [-0.88; 0.31; -0.36; -0.03]
     s = sign.(pca) ./ sign.(opca.pc)
     @test isapprox(s .* opca.pc ./ norm(opca.pc), pca, atol = 1e-1)
 
-    x = mvrandn(N, m, U)
+    MCBayes.reset!(opca)
+    @test all(opca.pc .!= 0)
+    @test opca.n[1] == 0
 
-    opca = OnlinePCA(dims);
+    om = MCBayes.OnlineMoments(dims, 1)
     for n in 1:div(N, 4)
         b = 4 * (n - 1) + 1
         e = 4 * n
         idx = b:e
-        update!(opca, x[:, idx])
+        y = x[:, idx]
+        MCBayes.update!(om, y)
+        MCBayes.update!(opca, y .- om.m)
     end
 
     @test opca.n[1] == N
-    @test isapprox(opca.m, mean(x, dims = 2))
-
-    pca = [-0.88; 0.31; -0.36; -0.03]
     s = sign.(pca) ./ sign.(opca.pc)
     @test isapprox(s .* opca.pc ./ norm(opca.pc), pca, atol = 1e-1)
 end

@@ -186,20 +186,15 @@ function adapt!(
         update!(stepsize_adapter, abar, m; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
-        positions = draws[m, :, :]
+        positions = draws[m+1, :, :]
         update!(metric_adapter, positions, ldg; kwargs...)
-        w = m ^ -0.6    # TODO make an uniquely named keyword argument
-        # TODO this pattern could use some structure: ExponentialDecayAverage, a struct EDA or at least a method
-        metric_adapter.metric .=
-            w .* optimum(metric_adapter; kwargs...) .+ (1 - w) .* sampler.metric[:, 1]
         set!(sampler, metric_adapter; kwargs...)
 
         metric = sampler.metric[:, 1]
         metric ./= maximum(metric)
 
         if :pca in fieldnames(typeof(sampler))
-            update!(pca_adapter, positions ./ sqrt.(metric); kwargs...)
-            pca_adapter.pc .= w .* optimum(pca_adapter; kwargs...) .+ (1 - w) .* sampler.pca
+            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ sqrt.(metric); kwargs...)
             set!(sampler, pca_adapter; kwargs...)
 
             update!(damping_adapter, m, sampler.stepsize, sqrt(norm(sampler.pca)); kwargs...)
@@ -216,7 +211,7 @@ function adapt!(
                 trajectorylength_adapter,
                 m,
                 accept_stats,
-                positions,
+                draws[m, :, :]
                 trace.momentum,
                 trace.position,
                 sampler.stepsize[1],

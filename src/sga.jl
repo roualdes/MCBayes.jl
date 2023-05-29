@@ -106,7 +106,8 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
     chains = size(draws, 3)
     trajectorylength = sampler.trajectorylength[1]
     stepsize = sampler.stepsize[1]
-    steps = max(1, ceil(Int, 2 * halton(m) * trajectorylength / stepsize))
+    steps = trajectorylength / stepsize
+    steps = round(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     Threads.@threads for it in 1:nt

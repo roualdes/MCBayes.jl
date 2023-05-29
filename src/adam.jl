@@ -9,7 +9,7 @@ struct Adam{T<:AbstractFloat}
 end
 
 function Adam(
-    dims, T=Float64; α=0.05, β1=0.0, β2=0.5, ι=1e-8, adam_schedule=:constant, kwargs...
+    dims, T=Float64; α=0.05, β1=0.0, β2=0.95, ι=1e-8, adam_schedule=:constant, kwargs...
 )
     return Adam(
         zeros(T, dims),
