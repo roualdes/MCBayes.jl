@@ -164,8 +164,7 @@ function run_sampler!(
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
 
-        # TODO move adapt! into transition;
-        # adaptations effectively should be unique to each algorithm
+        # TODO adaptations effectively should be unique to each algorithm
         # adaptation schedules don't generalize well
         adapt!(
             sampler,

@@ -105,9 +105,9 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
     u = halton(m)
-    trajectorylength = sampler.trajectorylength[1]
+    trajectorylength_mean = sampler.trajectorylength[1]
     tld = get(kwargs, :trajectorylength_distribution, :uniform)
-    trajectorylength = tld == :uniform ? 2u * trajectorylength : -log(u) * trajectorylength
+    trajectorylength = tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
     stepsize = sampler.stepsize[1]
     steps = trajectorylength / stepsize
     steps = isfinite(steps) ? steps : 1
@@ -128,7 +128,7 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
                 1000;
                 kwargs...,
             )
-            info = (; info..., trajectorylength)
+            info = (; info..., trajectorylength = trajectorylength_mean)
             record!(sampler, trace, info, m + 1, chain)
         end
     end
