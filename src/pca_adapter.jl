@@ -12,7 +12,7 @@ struct PCAOnline{T<:AbstractFloat} <: AbstractPCAAdapter{T}
     alpha::T
 end
 
-function PCAOnline(T, dims; pca_smoothing_factor = 1 - 3/4, l = 2.0, kwargs...)
+function PCAOnline(T, dims; pca_smoothing_factor = 1 - 3/4, l = 0.0, kwargs...)
     opca = OnlinePCA(T, dims, l)
     return PCAOnline(opca, zeros(T, dims), pca_smoothing_factor)
 end

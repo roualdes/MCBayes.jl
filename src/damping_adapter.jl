@@ -58,8 +58,8 @@ function DampingMALT(initial_damping::AbstractVector, args...; kwargs...)
     return DampingMALT(initial_damping, initial_damping)
 end
 
-function update!(dmalt::DampingMALT, m, stepsize, gamma, args...; damping_coefficient = 1, kwargs...)
-    dmalt.damping .= 0.5 .* stepsize .* damping_coefficient ./ (1e-10 .+ sqrt(gamma)) # max.(1 / m, -0.5 .* stepsize .* damping_coefficient ./ (1e-10 .+ gamma))
+function update!(dmalt::DampingMALT, m, gamma, args...; damping_coefficient = 1, kwargs...)
+    dmalt.damping .= damping_coefficient ./ (1e-10 .+ sqrt(gamma))
     dmalt.damping_bar .= dmalt.damping
 end
 
