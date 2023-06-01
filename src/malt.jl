@@ -29,12 +29,12 @@ function sample!(
     ldg;
     iterations=2000,
     warmup=iterations,
-    draws_initializer=DrawsInitializerStan(),
+    draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
-    stepsize_adapter=StepsizeAdam(sampler.stepsize; δ=0.8),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
-    trajectorylength_adapter = TrajectorylengthMALT(sampler.trajectorylength, sampler.dims),
+    trajectorylength_adapter = TrajectorylengthMALT(sampler.trajectorylength, sampler.dims, warmup),
     damping_adapter = DampingMALT(sampler.damping),
     noise_adapter = NoiseMALT(sampler.noise),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
@@ -64,7 +64,7 @@ function transition!(sampler::MALT, m, ldg, draws, rngs, trace; kwargs...)
     stepsize = sampler.stepsize[1]
     trajectorylength = sampler.trajectorylength[1]
     steps = trajectorylength / stepsize
-    steps = round(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
+    steps = 10 # round(Int64, clamp(ifelse(isfinite(steps), steps, 1), 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     noise = sampler.noise[1]

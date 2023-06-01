@@ -106,10 +106,12 @@ function trace(sampler::MALT{T}, iterations) where {T}
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),
             stepsize=zeros(T, iterations, chains),
+            steps=zeros(Int, iterations, 1),
             damping=zeros(T, iterations, chains),
             noise=zeros(T, iterations, chains),
             trajectorylength=zeros(T, iterations, chains),
             ld=zeros(T, iterations, chains),
+            previousmomentum=zeros(T, dims, chains),
             momentum=zeros(T, dims, chains),
             position=zeros(T, dims, chains)
 )
@@ -123,6 +125,8 @@ function record!(sampler::MALT{T}, trace::NamedTuple, info, iteration, chain) wh
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:steps][iteration] = info[:steps]
+    trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
 end
@@ -135,6 +139,7 @@ function trace(sampler::AbstractSGA{T}, iterations) where {T}
             accepted=zeros(Bool, iterations, chains),
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),
+            previousmomentum=zeros(T, dims, chains),
             momentum=zeros(T, dims, chains),
             position=zeros(T, dims, chains),
             stepsize=zeros(T, iterations, 1),
@@ -156,6 +161,7 @@ function record!(
     trace[:steps][iteration] = info[:steps]
     trace[:trajectorylength][iteration] = info[:trajectorylength]
     trace[:stepsize][iteration] = info[:stepsize]
+    trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
 end

@@ -39,13 +39,12 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay=100,
     kwargs...,
 )
     warmup = schedule.warmup
     if m <= warmup
-        accept_stats = trace.acceptstat[m, :]
-        update!(stepsize_adapter, accept_stats, m; warmup, kwargs...)
+        accept_stats = trace.acceptstat[m + 1, :]
+        update!(stepsize_adapter, accept_stats, m + 1; warmup, kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
@@ -173,57 +172,65 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay=100,
+    stepsize_delay=100,
+    trajectorylength_delay=0,
     kwargs...,
 )
     warmup = schedule.warmup
     if m <= warmup
-        T = eltype(trace.acceptstat)
-        accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m, :]]
-        accept_stats .+= 1e-20
-        abar = inv(mean(inv, accept_stats))
-
-        update!(stepsize_adapter, abar, m; warmup, kwargs...)
-        set!(sampler, stepsize_adapter; kwargs...)
-
-        positions = draws[m+1, :, :]
+        positions = draws[m + 1, :, :]
         update!(metric_adapter, positions, ldg; kwargs...)
         set!(sampler, metric_adapter; kwargs...)
 
-        metric = sampler.metric[:, 1]
-        metric ./= maximum(metric)
 
         if :pca in fieldnames(typeof(sampler))
-            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ sqrt.(metric); kwargs...)
+            metric = sqrt.(sampler.metric[:, 1])
+            metric ./= maximum(metric)
+
+            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ metric; kwargs...)
             set!(sampler, pca_adapter; kwargs...)
-
-            update!(damping_adapter, m, sampler.stepsize, sqrt(norm(sampler.pca)); kwargs...)
-            set!(sampler, damping_adapter; kwargs...)
         end
-
+        
         if :damping in fieldnames(typeof(sampler))
+            update!(damping_adapter, m + 1, sampler.stepsize, norm(sampler.pca); kwargs...)
+            set!(sampler, damping_adapter; kwargs...)
+
             update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
             set!(sampler, noise_adapter; kwargs...)
+        end
+
+        T = eltype(trace.acceptstat)
+        accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m + 1, :]]
+        accept_stats .+= 1e-20
+
+        if m > stepsize_delay
+            abar = inv(mean(inv, accept_stats))
+            update!(stepsize_adapter, abar, m + 1; warmup, kwargs...)
+            set!(sampler, stepsize_adapter; kwargs...)
         end
 
         if m > trajectorylength_delay
             update!(
                 trajectorylength_adapter,
-                m,
+                m + 1,
                 accept_stats,
-                draws[m, :, :]
+                draws[m, :, :],
+                trace.previousmomentum,
                 trace.momentum,
                 trace.position,
                 sampler.stepsize[1],
-                sampler.pca,
+                sampler.pca ./ norm(sampler.pca),
                 ldg;
                 kwargs...,
             )
             set!(sampler, trajectorylength_adapter; kwargs...)
+        else
+            trajectorylength_adapter.trajectorylength[1] = sampler.stepsize[1]
+            set!(sampler, trajectorylength_adapter; kwargs...)
         end
     else
-        set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
+        set!(sampler, stepsize_adapter; smoothed = true, kwargs...)
+        set!(sampler, trajectorylength_adapter; smoothed = true, kwargs...)
     end
 end
 
@@ -244,6 +251,5 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    trajectorylength_delay=1000,
     kwargs...,
 ) end
