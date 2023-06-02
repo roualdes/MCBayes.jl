@@ -27,8 +27,8 @@ end
 function trace(sampler::RWM{T}, iterations) where {T}
     chains = sampler.chains
     return (;
-        accepted=zeros(Bool, iterations, chains),
-        acceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            acceptstat=zeros(T, iterations, chains),
             stepsize=zeros(T, iterations, chains),
             ld=zeros(T, iterations, chains),
     )

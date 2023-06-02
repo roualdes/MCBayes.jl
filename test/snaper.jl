@@ -1,4 +1,4 @@
-@testset "ChEES" begin
+@testset "SNAPER" begin
     iterations = 5_000
     warmup = 2_000
 
@@ -8,8 +8,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -22,8 +22,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -36,8 +36,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -50,8 +50,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -64,8 +64,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; iterations=iterations, warmup=warmup)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; iterations=iterations, warmup=warmup)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -81,8 +81,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -98,8 +98,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -112,8 +112,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        chees = ChEES(dims)
-        draws, diagnostics, rngs = sample!(chees, ldg; warmup=warmup, iterations=iterations)
+        snpr = SNAPER(dims)
+        draws, diagnostics, rngs = sample!(snpr, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
         true_means = expectations[model_name][:true_mean]

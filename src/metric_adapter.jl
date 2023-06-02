@@ -16,7 +16,8 @@ function MetricOnlineMoments(initial_metric::AbstractMatrix{T}, args...;
                              metric_smoothing_factor = 1 - 8/9, kwargs...) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
-    return MetricOnlineMoments(om, initial_metric, metric_smoothing_factor)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricOnlineMoments(om, initial_metric, smoothing_factor)
 end
 
 function update!(mom::MetricOnlineMoments{T}, x::AbstractMatrix, args...;
@@ -74,7 +75,8 @@ function MetricFisherDivergence(initial_metric::AbstractMatrix{T}, args...;
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     og = OnlineMoments(T, dims, metrics)
-    return MetricFisherDivergence(om, og, initial_metric)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricFisherDivergence(om, og, initial_metric, smoothing_factor)
 end
 
 function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...;

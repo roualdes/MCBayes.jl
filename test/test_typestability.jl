@@ -6,8 +6,6 @@
         return ld(x), -x
     end
 
-    # since Float64 is default in most cases,
-    # I'm satisfied to test only against Float32
     T = Float32
     dims = 10
     chains = 4
@@ -43,4 +41,22 @@
     @test isequal(eltype(draws), T)
     @test isequal(eltype(mala.metric), T)
     @test isequal(eltype(mala.stepsize), T)
+
+    chees = ChEES(dims, chains, T)
+    draws, diagnostics, rngs = sample!(chees, ldg; iterations)
+    @test isequal(eltype(draws), T)
+    @test isequal(eltype(chees.metric), T)
+    @test isequal(eltype(chees.stepsize), T)
+
+    snpr = SNAPER(dims, chains, T)
+    draws, diagnostics, rngs = sample!(snpr, ldg; iterations)
+    @test isequal(eltype(draws), T)
+    @test isequal(eltype(snpr.metric), T)
+    @test isequal(eltype(snpr.stepsize), T)
+
+    malt = MALT(dims, chains, T)
+    draws, diagnostics, rngs = sample!(malt, ldg; iterations)
+    @test isequal(eltype(draws), T)
+    @test isequal(eltype(malt.metric), T)
+    @test isequal(eltype(malt.stepsize), T)
 end
