@@ -91,7 +91,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
         end
 
         if stepsize > 1e7
-            throw("Posterior is impropoer.  Please check your model.")
+            throw("Posterior is improper.  Please check your model.")
         end
         if stepsize <= 0.0
             throw(
@@ -191,7 +191,7 @@ function initialize_stepsize!(
             )
             αs[c] = info.acceptstat
         end
-        harmonic_mean = inv(mean(inv, αs))
+        harmonic_mean = mean(αs) # inv(mean(inv, αs))
     end
 
     stepsize_adapter.stepsize .= stepsize

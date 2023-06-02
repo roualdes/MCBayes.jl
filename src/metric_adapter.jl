@@ -3,41 +3,32 @@ abstract type AbstractMetricAdapter{T} end
 Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
 function set!(sampler, ma::AbstractMetricAdapter, args...; kwargs...)
-    sampler.metric .= optimum(ma; kwargs...)
-end
-
-function optimum(ma::AbstractMetricAdapter, args...; kwargs...)
-    return ma.metric
+    sampler.metric .= ma.metric
 end
 
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     metric::Matrix{T}
+    alpha::T
 end
 
-function MetricOnlineMoments(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
+function MetricOnlineMoments(initial_metric::AbstractMatrix{T}, args...;
+                             metric_smoothing_factor = 1 - 8/9, kwargs...) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
-    return MetricOnlineMoments(om, initial_metric)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricOnlineMoments(om, initial_metric, smoothing_factor)
 end
 
-function update!(mom::MetricOnlineMoments, x::AbstractMatrix, args...; kwargs...)
+function update!(mom::MetricOnlineMoments{T}, x::AbstractMatrix, args...;
+                 metric_regularize = true, metric_smooth = true, kwargs...) where {T}
     update!(mom.om, x; kwargs...)
-end
-
-function optimum(mom::MetricOnlineMoments, args...; regularized=true, kwargs...)
-    T = eltype(mom.om.v)
-    if mom.om.n[1] > 1
-        v = if regularized
-            w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
-            w .* mom.om.v .+ (1 .- w) .* convert(T, 1e-3)::T
-        else
-            mom.om.v
-        end
-        return v
-    else
-        return ones(T, size(mom.om.v))
+    if metric_regularize
+        w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
+        mom.metric .= w .* mom.om.v .+ (1 .- w) .* convert(T, 1e-3)::T
     end
+    w = mom.alpha + (1 - metric_smooth) * (1 - mom.alpha)
+    mom.metric .= w .* mom.om.v .+ (1 - w) .* mom.metric
 end
 
 function reset!(mom::MetricOnlineMoments, args...; kwargs...)
@@ -48,7 +39,7 @@ struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
 end
 
-function MetricConstant(initial_metric::AbstractMatrix; kwargs...)
+function MetricConstant(initial_metric::AbstractMatrix, args...; kwargs...)
     return MetricConstant(initial_metric)
 end
 
@@ -60,7 +51,7 @@ struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
 end
 
-function MetricECA(initial_metric::AbstractMatrix; kwargs...)
+function MetricECA(initial_metric::AbstractMatrix, args...; kwargs...)
     return MetricECA(initial_metric)
 end
 
@@ -76,31 +67,28 @@ struct MetricFisherDivergence{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     og::OnlineMoments{T}
     metric::Matrix{T}
+    alpha::T
 end
 
-function MetricFisherDivergence(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
+function MetricFisherDivergence(initial_metric::AbstractMatrix{T}, args...;
+                                metric_smoothing_factor = 1 - 8/9, kwargs...) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     og = OnlineMoments(T, dims, metrics)
-    return MetricFisherDivergence(om, og, initial_metric)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricFisherDivergence(om, og, initial_metric, smoothing_factor)
 end
 
-function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...; kwargs...)
+function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...;
+                 metric_smooth = true, kwargs...)
     grads = similar(x)
     for c in axes(grads, 2)
         _, grads[:, c] = ldg(x[:, c]; kwargs...)
     end
     update!(mfd.om, x; kwargs...)
     update!(mfd.og, grads; kwargs...)
-end
-
-function optimum(mfd::MetricFisherDivergence, args...; kwargs...)
-    T = eltype(mfd.om.v)
-    if mfd.om.n[1] > 1
-        return sqrt.(mfd.om.v ./ mfd.og.v)
-    else
-        return ones(T, size(mfd.om.v))
-    end
+    w = mfd.alpha + (1 - metric_smooth) * (1 - mfd.alpha)
+    mfd.metric .= w .* sqrt.(mfd.om.v ./ mfd.og.v) .+ (1 - w) .* mfd.metric
 end
 
 function reset!(mfd::MetricFisherDivergence, args...; kwargs...)

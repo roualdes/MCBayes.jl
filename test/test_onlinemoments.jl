@@ -6,7 +6,7 @@
     v = reshape(var(x; dims=1, corrected=false), (dims, chains))
 
     # separate moments for each chain of x
-    om = OnlineMoments(dims, chains)
+    om = MCBayes.OnlineMoments(dims, chains)
 
     for n in 1:N
         MCBayes.update!(om, x[n, :, :])
@@ -24,7 +24,7 @@
     # same moments for all chains of x
     m = reshape(mean(x; dims=(1, 3)), dims)
     v = reshape(var(x; dims=(1, 3), corrected=false), dims)
-    om = OnlineMoments(dims)
+    om = MCBayes.OnlineMoments(dims)
 
     for n in 1:N
         MCBayes.update!(om, x[n, :, :])

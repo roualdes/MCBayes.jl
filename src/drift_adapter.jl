@@ -7,7 +7,9 @@ function optimum(da::AbstractDriftAdapter, args...; smoothed=false, kwargs...)
 end
 
 function set!(sampler, da::AbstractDriftAdapter, args...; kwargs...)
-    sampler.drift .= optimum(da)
+    if :drift in fieldnames(typeof(sampler))
+        sampler.drift .= optimum(da)
+    end
 end
 
 struct DriftECA{T<:AbstractFloat} <: AbstractDriftAdapter{T}

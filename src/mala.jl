@@ -54,7 +54,7 @@ function transition!(sampler::MALA, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.metric[:, chain],
                 sampler.stepsize[chain],
                 1,
-                1000,
+                1000;
                 kwargs...,
             )
             record!(sampler, trace, info, m + 1, chain)

@@ -1,3 +1,35 @@
+function malt!(
+    position, position_next, ldg, rng, dims, metric, stepsize, steps, noise, maxdeltaH; kwargs...
+)
+    T = eltype(position)
+    q = copy(position)
+    p = randn(rng, T, dims)
+
+    ld0, gradient = ldg(q; kwargs...)
+    isnan(ld0) && (ld0 = typemin(T))
+
+    Δ, ld = langevin_trajectory!(
+        q, p, ldg, gradient, stepsize .* sqrt.(metric), steps, noise; kwargs...
+            )
+
+    isnan(ld) && (ld = typemin(T))
+    Δ += ld - ld0
+    divergent = -Δ > maxdeltaH
+
+    a = min(1, exp(Δ))
+    accepted = rand(rng, T) < a
+    if accepted
+        position_next .= q
+    else
+        position_next .= position
+    end
+
+    return (;
+            accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p),
+            momentum=p, position=q,
+    )
+end
+
 function hmc!(
     position, position_next, ldg, rng, dims, metric, stepsize, steps, maxdeltaH; kwargs...
 )
@@ -11,7 +43,7 @@ function hmc!(
 
     ld, gradient = leapfrog!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
-    )
+            )
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
@@ -26,7 +58,7 @@ function hmc!(
     end
 
     return (;
-        accepted, divergent, stepsize, steps, acceptstat=a, energy=H, momentum=p, position=q
+        accepted, divergent, stepsize, steps, ld, acceptstat=a, energy=H, momentum=p, position=q
     )
 end
 
@@ -81,14 +113,16 @@ function pghmc!(
     end
 
     return (;
-        accepted,
-        divergence,
-        energy,
-        acceptstat=a > zero(a) ? one(a) : exp(a),
-        noise,
-        drift,
-        damping,
-        stepsize,
+            accepted,
+            divergence,
+            energy,
+            noise,
+            drift,
+            damping,
+            stepsize,
+            ld,
+            acceptstat=a > zero(a) ? one(a) : exp(a),
+
     )
 end
 

@@ -7,7 +7,9 @@ function optimum(da::AbstractDampingAdapter, args...; smoothed=false, kwargs...)
 end
 
 function set!(sampler, da::AbstractDampingAdapter, args...; kwargs...)
-    sampler.damping .= optimum(da)
+    if :damping in fieldnames(typeof(sampler))
+        sampler.damping .= optimum(da)
+    end
 end
 
 struct DampingECA{T<:AbstractFloat} <: AbstractDampingAdapter{T}
@@ -38,10 +40,35 @@ struct DampingConstant{T<:AbstractFloat} <: AbstractDampingAdapter{T}
     damping_bar::Vector{T}
 end
 
-function DampingConstant(initial_drift::AbstractVector; kwargs...)
-    return DampingConstant(initial_drift, initial_drift)
+function DampingConstant(initial_damping::AbstractVector; kwargs...)
+    return DampingConstant(initial_damping, initial_damping)
 end
 
 function update!(dc::DampingConstant, args...; kwargs...) end
 
 function reset!(dc::DampingConstant, args...; kwargs...) end
+
+
+struct DampingMALT{T<:AbstractFloat} <: AbstractDampingAdapter{T}
+    damping::Vector{T}
+    damping_bar::Vector{T}
+end
+
+function DampingMALT(initial_damping::AbstractVector, args...; kwargs...)
+    return DampingMALT(initial_damping, initial_damping)
+end
+
+function update!(dmalt::DampingMALT, m, gamma, args...; damping_coefficient = 1, kwargs...)
+    dmalt.damping .= damping_coefficient ./ (1e-10 .+ sqrt(gamma))
+    dmalt.damping_bar .= dmalt.damping
+end
+
+function set!(sampler, dmalt::DampingMALT, args...; kwargs...)
+    sampler.damping .= dmalt.damping
+end
+
+# TODO(ear) move reset into AbstractDampingAdapter
+function reset!(dmalt::DampingMALT, args...; kwargs...)
+    dmalt.damping .= 0
+    dmalt.damping_bar .= 0
+end

@@ -7,6 +7,8 @@ struct OnlineMoments{T<:AbstractFloat}
     v::Matrix{T}
 end
 
+Base.eltype(::OnlineMoments{T}) where {T} = T
+
 # TODO T should come last to be more like Adam
 function OnlineMoments(T, d, c)
     return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
@@ -23,7 +25,7 @@ determines whether or not any updates will actually be applied.
 OnlineMoments(d, c=1) = OnlineMoments(Float64, d, c)
 
 """
-    update!(om::OnlineMoments, x::Matrix; kwargs...)
+    update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
 
 Update om's mean and variance `Matrix`es with the data contained in x.
 The rows of x and om.m (and thus om.v) must match.  The columns of x

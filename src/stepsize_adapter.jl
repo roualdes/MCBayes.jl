@@ -12,29 +12,28 @@ end
 
 struct StepsizeAdam{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     adam::Adam{T}
-    δ::T
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
+    δ::T
+    alpha::T
 end
 
 function StepsizeAdam(
-    initial_stepsize::AbstractVector{T}; δ=0.8, kwargs...
+    initial_stepsize::AbstractVector{T}, warmup; δ=0.8, stepsize_smoothing_factor = 1 - 8/9, kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
-    adam = Adam(chains, T; kwargs...)
-    return StepsizeAdam(adam, δ, initial_stepsize, initial_stepsize)
+    adam = Adam(chains, warmup, T; kwargs...)
+    return StepsizeAdam(adam, initial_stepsize, initial_stepsize, δ, stepsize_smoothing_factor)
 end
 
 """
 Adam update on log-scale.
 """
-function update!(ssa::StepsizeAdam, abar, m, args...; γ=-0.6, kwargs...)
+function update!(ssa::StepsizeAdam, abar, m, args...; stepsize_smooth = true, kwargs...)
     x = update!(ssa.adam, abar - ssa.δ, m; kwargs...)
     @. ssa.stepsize *= exp(x)
-    w = m^γ
-    @. ssa.stepsize_bar = exp(
-        w * log(ssa.stepsize) + (1 - w) * log(1e-10 + ssa.stepsize_bar)
-    )
+    w = ssa.alpha + (1 - stepsize_smooth) * (1 - ssa.alpha)
+    @. ssa.stepsize_bar = exp( w * log(ssa.stepsize) + (1 - w) * log(1e-10 + ssa.stepsize_bar) )
 end
 
 function reset!(ssa::StepsizeAdam, args...; kwargs...)

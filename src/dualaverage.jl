@@ -24,7 +24,7 @@ function DualAverage(chains, T=Float64; μ=log(10), δ=0.8, γ=0.05, t0=10.0, κ
     )
 end
 
-function update!(da::DualAverage, αs; kwargs...)
+function update!(da::DualAverage, αs, args...; kwargs...)
     da.counter .+= 1
     α = [a > 1 ? 1 : a for a in αs]
     eta = 1 ./ (da.counter .+ da.t0)
@@ -35,13 +35,13 @@ function update!(da::DualAverage, αs; kwargs...)
     return exp.(x), exp.(da.xbar)
 end
 
-function reset!(da::DualAverage; initial_stepsize=1)
+function reset!(da::DualAverage, args...; initial_stepsize=1, kwargs...)
     @. da.μ = log(10 * oftype(da.μ, initial_stepsize))
     da.sbar .= 0
     da.xbar .= 0
     da.counter .= 0
 end
 
-function optimum(da::DualAverage)
+function optimum(da::DualAverage, args...; kwargs...)
     return da.εbar
 end
