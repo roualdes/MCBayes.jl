@@ -4,6 +4,8 @@
 # [3] https://github.com/tensorflow/probability/blob/c678caa1b8e94ab3677a37e581e8b19e68e59248/tensorflow_probability/python/experimental/mcmc/gradient_based_trajectory_length_adaptation.py
 # [4] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/sga_hmc.py
 # [5] https://github.com/tensorflow/probability/blob/5ebcdf1f32ecc340dece4f21694790ea95c6c1e2/spinoffs/fun_mc/fun_mc/fun_mc_lib.py
+# [6] https://arxiv.org/pdf/2210.12200.pdf
+# [7] https://github.com/tensorflow/probability/blob/main/discussion/adaptive_malt/adaptive_malt.py#L537
 
 abstract type AbstractTrajectorylengthAdapter{T} end
 
@@ -31,16 +33,17 @@ function update!(
     r,
     ldg,
     args...;
-    γ=-0.6,
+    γ=-0.6, # TODO replace by aw below, or needs to be renamed
     kwargs...,
 )
     update!(tla.omstates, positions; kwargs...)
     update!(tla.omproposals, qs; kwargs...)
     ghats = trajectorylength_gradient(tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg)
 
-    αbar = inv(mean(inv, αs))
-    if αbar < 1e-4 || !all(isfinite.(ghats)) # [3]#L733
-        ghats .= zero(ghats)
+    for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
+        if !isfinite(gi) || ai < 1e-4
+            αs[i] = 1e-20
+        end
     end
 
     ghat = weighted_mean(ghats, αs)

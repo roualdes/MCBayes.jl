@@ -172,8 +172,8 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
-    stepsize_delay=100,
-    trajectorylength_delay=0,
+    stepsize_delay=0,
+    trajectorylength_delay=100,
     kwargs...,
 )
     warmup = schedule.warmup
@@ -187,12 +187,14 @@ function adapt!(
             metric = sqrt.(sampler.metric[:, 1])
             metric ./= maximum(metric)
 
+            # TODO need something better/different than metric_adapter.om.m,
+            # MetricConstant doesn't have a .om.m
             update!(pca_adapter, (positions .- metric_adapter.om.m) ./ metric; kwargs...)
             set!(sampler, pca_adapter; kwargs...)
         end
-        
+
         if :damping in fieldnames(typeof(sampler))
-            update!(damping_adapter, m + 1, sampler.stepsize, norm(sampler.pca); kwargs...)
+            update!(damping_adapter, m + 1, norm(sampler.pca); kwargs...)
             set!(sampler, damping_adapter; kwargs...)
 
             update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
