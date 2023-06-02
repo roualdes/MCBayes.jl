@@ -12,14 +12,16 @@ struct PCAOnline{T<:AbstractFloat} <: AbstractPCAAdapter{T}
     alpha::T
 end
 
-function PCAOnline(T, dims; pca_smoothing_factor = 1 - 3/4, l = 0.0, kwargs...)
-    opca = OnlinePCA(T, dims, l)
-    return PCAOnline(opca, zeros(T, dims), pca_smoothing_factor)
+function PCAOnline(T, dims; pca_smoothing_factor=1 - 3 / 4, l=0, kwargs...)
+    opca = OnlinePCA(T, dims, convert(T, l))
+    return PCAOnline(opca, zeros(T, dims), convert(T, pca_smoothing_factor))
 end
 
 PCAOnline(dims; kwargs...) = PCAOnline(Float64, dims; kwargs...)
 
-function update!(pca::PCAOnline{T}, x::AbstractMatrix, args...; pca_smooth = true, kwargs...) where {T}
+function update!(
+    pca::PCAOnline{T}, x::AbstractMatrix, args...; pca_smooth=true, kwargs...
+) where {T}
     update!(pca.opca, x; kwargs...)
     w = pca.alpha + (1 - pca_smooth) * (1 - pca.alpha)
     pca.pc .= w .* pca.opca.pc .+ (1 - w) .* pca.pc

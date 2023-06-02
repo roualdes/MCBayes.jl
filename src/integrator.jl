@@ -14,14 +14,16 @@ function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...
     return ld, gradient
 end
 
-function langevin_trajectory!(position, momentum, ldg, gradient, stepsize, steps, noise; kwargs...)
+function langevin_trajectory!(
+    position, momentum, ldg, gradient, stepsize, steps, noise; kwargs...
+)
     T = eltype(position)
     Δ = zero(T)
     ld = zero(T)
     ξ = randn(length(momentum), steps)
 
     for step in 1:steps
-        @. @views momentum = noise * momentum + sqrt(1 - noise ^ 2) * ξ[:, step]
+        @. @views momentum = noise * momentum + sqrt(1 - noise^2) * ξ[:, step]
         Δ += 0.5 * (momentum' * momentum)
         ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
         Δ -= 0.5 * (momentum' * momentum)

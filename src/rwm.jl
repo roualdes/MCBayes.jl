@@ -68,5 +68,5 @@ function rwm_kernel!(position, position_next, rng, dims, metric, stepsize, ld; k
     acceptstat = min(1, a)
     accepted = rand(rng, T) < acceptstat
     position_next .= position_next .* accepted .+ position .* (1 - accepted)
-    return (; accepted, acceptstat, stepsize, ld = ld_next)
+    return (; accepted, acceptstat, stepsize, ld=ld_next)
 end

@@ -120,9 +120,7 @@ function run_sampler!(
     metric_adapter=MetricConstant(
         hasfield(typeof(sampler), :metric) ? sampler.metric : ones(1)
     ),
-    pca_adapter=PCAConstant(
-        hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1)
-    ),
+    pca_adapter=PCAConstant(hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1)),
     damping_adapter=DampingConstant(
         hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)
     ),

@@ -48,7 +48,6 @@ function update!(dc::DampingConstant, args...; kwargs...) end
 
 function reset!(dc::DampingConstant, args...; kwargs...) end
 
-
 struct DampingMALT{T<:AbstractFloat} <: AbstractDampingAdapter{T}
     damping::Vector{T}
     damping_bar::Vector{T}
@@ -58,7 +57,7 @@ function DampingMALT(initial_damping::AbstractVector, args...; kwargs...)
     return DampingMALT(initial_damping, initial_damping)
 end
 
-function update!(dmalt::DampingMALT, m, gamma, args...; damping_coefficient = 1, kwargs...)
+function update!(dmalt::DampingMALT, m, gamma, args...; damping_coefficient=1, kwargs...)
     dmalt.damping .= damping_coefficient ./ (1e-10 .+ sqrt(gamma))
     dmalt.damping_bar .= dmalt.damping
 end

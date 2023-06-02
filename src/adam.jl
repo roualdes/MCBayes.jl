@@ -10,7 +10,15 @@ struct Adam{T<:AbstractFloat}
 end
 
 function Adam(
-    dims, decaysteps, T=Float64; α=0.05, β1=0.0, β2=0.95, ι=1e-8, adam_schedule = :linear, kwargs...
+    dims,
+    decaysteps,
+    T=Float64;
+    α=0.05,
+    β1=0.0,
+    β2=0.95,
+    ι=1e-8,
+    adam_schedule=:linear,
+    kwargs...,
 )
     return Adam(
         decaysteps,

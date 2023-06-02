@@ -38,7 +38,9 @@ function update!(
 )
     update!(tla.omstates, positions; kwargs...)
     update!(tla.omproposals, qs; kwargs...)
-    ghats = trajectorylength_gradient(tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg)
+    ghats = trajectorylength_gradient(
+        tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg
+    )
 
     for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
         if !isfinite(gi) || ai < 1e-4
@@ -54,7 +56,7 @@ function update!(
     T = min(T, stepsize * tla.maxleapfrogsteps)  # [3]#L773
 
     tla.trajectorylength[1] = T
-    aw = 1 - 8/9                # TODO add this as an argument to the constructor
+    aw = 1 - 8 / 9                # TODO add this as an argument to the constructor
     # TODO and then re-design like OnlineMoments
     tla.trajectorylength_bar[1] = exp(
         aw * log(T) + (1 - aw) * log(1e-10 + tla.trajectorylength_bar[1])
@@ -62,7 +64,16 @@ function update!(
 end
 
 function trajectorylength_gradient(
-    tla::AbstractTrajectorylengthAdapter, m, αs, positions, previousps, ps, qs, stepsize, r, ldg
+    tla::AbstractTrajectorylengthAdapter,
+    m,
+    αs,
+    positions,
+    previousps,
+    ps,
+    qs,
+    stepsize,
+    r,
+    ldg,
 )
     dims, chains = size(positions)
 
@@ -99,13 +110,22 @@ struct TrajectorylengthChEES{T<:AbstractFloat} <: AbstractTrajectorylengthAdapte
 end
 
 function TrajectorylengthChEES(
-    initial_trajectorylength::AbstractVector{T}, dims, warmup; maxleapfrogsteps=1000, kwargs...
+    initial_trajectorylength::AbstractVector{T},
+    dims,
+    warmup;
+    maxleapfrogsteps=1000,
+    kwargs...,
 ) where {T}
-    adam = Adam(1, warmup, T; α = 0.01, kwargs...)
+    adam = Adam(1, warmup, T; α=0.01, kwargs...)
     omstates = OnlineMoments(T, dims, 1)
     omproposals = OnlineMoments(T, dims, 1)
     return TrajectorylengthChEES(
-        adam, omstates, omproposals, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+        adam,
+        omstates,
+        omproposals,
+        initial_trajectorylength,
+        initial_trajectorylength,
+        maxleapfrogsteps,
     )
 end
 
@@ -122,7 +142,7 @@ function sampler_trajectorylength_gradient(
         dsq = centered_sum(abs2, q, mq) - centered_sum(abs2, positions[:, chain], mθ)
         fd = dsq * centered_dot(q, mq, ps[:, chain])
         fd2 = -dsq * centered_dot(positions[:, chain], mθ, -previousps[:, chain])
-        ghats[chain] = 2 * (fd + fd2) - dsq ^ 2 / t
+        ghats[chain] = 2 * (fd + fd2) - dsq^2 / t
         ghats[chain] *= h
     end
     return ghats
@@ -138,13 +158,22 @@ struct TrajectorylengthMALT{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter
 end
 
 function TrajectorylengthMALT(
-    initial_trajectorylength::AbstractVector{T}, dims, warmup; maxleapfrogsteps=1000, kwargs...
+    initial_trajectorylength::AbstractVector{T},
+    dims,
+    warmup;
+    maxleapfrogsteps=1000,
+    kwargs...,
 ) where {T}
-    adam = Adam(1, warmup, T; α = 0.01, kwargs...)
+    adam = Adam(1, warmup, T; α=0.01, kwargs...)
     omstates = OnlineMoments(T, dims, 1)
     omproposals = OnlineMoments(T, dims, 1)
     return TrajectorylengthMALT(
-        adam, omstates, omproposals, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+        adam,
+        omstates,
+        omproposals,
+        initial_trajectorylength,
+        initial_trajectorylength,
+        maxleapfrogsteps,
     )
 end
 
@@ -158,7 +187,7 @@ function sampler_trajectorylength_gradient(
     @views for chain in 1:chains
         q = qs[:, chain]
         tmp = centered_dot(q, mq, r)
-        dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
+        dsq = tmp^2 - centered_dot(positions[:, chain], mθ, r)^2
         fd = dsq * tmp * dot(ps[:, chain], r)
         tmp2 = centered_dot(positions[:, chain], mθ, r)
         fd2 = -dsq * tmp2 * dot(-previousps[:, chain], r)
@@ -177,13 +206,22 @@ struct TrajectorylengthSNAPER{T<:AbstractFloat} <: AbstractTrajectorylengthAdapt
 end
 
 function TrajectorylengthSNAPER(
-    initial_trajectorylength::AbstractVector{T}, dims, warmup; maxleapfrogsteps=1000, kwargs...
+    initial_trajectorylength::AbstractVector{T},
+    dims,
+    warmup;
+    maxleapfrogsteps=1000,
+    kwargs...,
 ) where {T}
-    adam = Adam(1, warmup, T; α = 0.01, kwargs...)
+    adam = Adam(1, warmup, T; α=0.01, kwargs...)
     omstates = OnlineMoments(T, dims, 1)
     omproposals = OnlineMoments(T, dims, 1)
     return TrajectorylengthMALT(
-        adam, omstates, omproposals, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+        adam,
+        omstates,
+        omproposals,
+        initial_trajectorylength,
+        initial_trajectorylength,
+        maxleapfrogsteps,
     )
 end
 
@@ -198,7 +236,7 @@ function sampler_trajectorylength_gradient(
     @views for chain in 1:chains
         q = qs[:, chain]
         tmp = centered_dot(q, mq, r)
-        dsq = tmp ^ 2 - centered_dot(positions[:, chain], mθ, r) ^ 2
+        dsq = tmp^2 - centered_dot(positions[:, chain], mθ, r)^2
         fd = dsq * tmp * dot(ps[:, chain], r)
         tmp2 = centered_dot(positions[:, chain], mθ, r)
         fd2 = -dsq * tmp2 * dot(-previousps[:, chain], r)
@@ -219,13 +257,22 @@ end
 
 # TODO enable trajectorylength_adam_schedule, separate from stepsize_adam_schedule
 function TrajectorylengthLDG(
-    initial_trajectorylength::AbstractVector{T}, dims, warmup; maxleapfrogsteps=1000, kwargs...
+    initial_trajectorylength::AbstractVector{T},
+    dims,
+    warmup;
+    maxleapfrogsteps=1000,
+    kwargs...,
 ) where {T}
     adam = Adam(1, warmup, T; kwargs...)
     omstates = OnlineMoments(T, dims, 1)
     omproposals = OnlineMoments(T, dims, 1)
     return TrajectorylengthMALT(
-        adam, omstates, omproposals, initial_trajectorylength, initial_trajectorylength, maxleapfrogsteps
+        adam,
+        omstates,
+        omproposals,
+        initial_trajectorylength,
+        initial_trajectorylength,
+        maxleapfrogsteps,
     )
 end
 
@@ -241,7 +288,7 @@ function sampler_trajectorylength_gradient(
         q = qs[:, chain]
         ldq, gradientq = ldg(q)
         ldp, gradientpos = ldg(positions[:, chain])
-        dsq = ldq ^ 2 - ldp ^ 2
+        dsq = ldq^2 - ldp^2
         fd = dsq * dot(gradientq, ps[:, chain])
         fd2 = -dsq * dot(gradientpos, previousps[:, chain])
         ghats[chain] = 2 * (fd + fd2) - dsq^2 / t

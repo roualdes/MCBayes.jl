@@ -12,16 +12,23 @@ struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     alpha::T
 end
 
-function MetricOnlineMoments(initial_metric::AbstractMatrix{T}, args...;
-                             metric_smoothing_factor = 1 - 8/9, kwargs...) where {T}
+function MetricOnlineMoments(
+    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     smoothing_factor = convert(T, metric_smoothing_factor)
     return MetricOnlineMoments(om, initial_metric, smoothing_factor)
 end
 
-function update!(mom::MetricOnlineMoments{T}, x::AbstractMatrix, args...;
-                 metric_regularize = true, metric_smooth = true, kwargs...) where {T}
+function update!(
+    mom::MetricOnlineMoments{T},
+    x::AbstractMatrix,
+    args...;
+    metric_regularize=true,
+    metric_smooth=true,
+    kwargs...,
+) where {T}
     update!(mom.om, x; kwargs...)
     if metric_regularize
         w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
@@ -70,8 +77,9 @@ struct MetricFisherDivergence{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     alpha::T
 end
 
-function MetricFisherDivergence(initial_metric::AbstractMatrix{T}, args...;
-                                metric_smoothing_factor = 1 - 8/9, kwargs...) where {T}
+function MetricFisherDivergence(
+    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     og = OnlineMoments(T, dims, metrics)
@@ -79,8 +87,14 @@ function MetricFisherDivergence(initial_metric::AbstractMatrix{T}, args...;
     return MetricFisherDivergence(om, og, initial_metric, smoothing_factor)
 end
 
-function update!(mfd::MetricFisherDivergence, x::AbstractMatrix, ldg, args...;
-                 metric_smooth = true, kwargs...)
+function update!(
+    mfd::MetricFisherDivergence,
+    x::AbstractMatrix,
+    ldg,
+    args...;
+    metric_smooth=true,
+    kwargs...,
+)
     grads = similar(x)
     for c in axes(grads, 2)
         _, grads[:, c] = ldg(x[:, c]; kwargs...)

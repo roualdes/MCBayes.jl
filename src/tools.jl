@@ -1,5 +1,15 @@
 function malt!(
-    position, position_next, ldg, rng, dims, metric, stepsize, steps, noise, maxdeltaH; kwargs...
+    position,
+    position_next,
+    ldg,
+    rng,
+    dims,
+    metric,
+    stepsize,
+    steps,
+    noise,
+    maxdeltaH;
+    kwargs...,
 )
     T = eltype(position)
     q = copy(position)
@@ -10,7 +20,7 @@ function malt!(
 
     Δ, ld = langevin_trajectory!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps, noise; kwargs...
-            )
+    )
 
     isnan(ld) && (ld = typemin(T))
     Δ += ld - ld0
@@ -25,8 +35,16 @@ function malt!(
     end
 
     return (;
-            accepted, divergent, stepsize, steps, noise, ld, acceptstat=a, energy=hamiltonian(ld, p),
-            momentum=p, position=q,
+        accepted,
+        divergent,
+        stepsize,
+        steps,
+        noise,
+        ld,
+        acceptstat=a,
+        energy=hamiltonian(ld, p),
+        momentum=p,
+        position=q,
     )
 end
 
@@ -43,7 +61,7 @@ function hmc!(
 
     ld, gradient = leapfrog!(
         q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
-            )
+    )
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
@@ -58,7 +76,15 @@ function hmc!(
     end
 
     return (;
-        accepted, divergent, stepsize, steps, ld, acceptstat=a, energy=H, momentum=p, position=q
+        accepted,
+        divergent,
+        stepsize,
+        steps,
+        ld,
+        acceptstat=a,
+        energy=H,
+        momentum=p,
+        position=q,
     )
 end
 
@@ -113,16 +139,15 @@ function pghmc!(
     end
 
     return (;
-            accepted,
-            divergence,
-            energy,
-            noise,
-            drift,
-            damping,
-            stepsize,
-            ld,
-            acceptstat=a > zero(a) ? one(a) : exp(a),
-
+        accepted,
+        divergence,
+        energy,
+        noise,
+        drift,
+        damping,
+        stepsize,
+        ld,
+        acceptstat=a > zero(a) ? one(a) : exp(a),
     )
 end
 

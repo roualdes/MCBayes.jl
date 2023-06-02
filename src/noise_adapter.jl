@@ -55,8 +55,7 @@ function update!(nc::NoiseConstant, args...; kwargs...) end
 
 function reset!(nc::NoiseConstant, args...; kwargs...) end
 
-
-struct NoiseMALT{T <: AbstractFloat} <: AbstractNoiseAdapter{T}
+struct NoiseMALT{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
     noise::Vector{T}
     noise_bar::Vector{T}
 end

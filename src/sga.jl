@@ -29,7 +29,9 @@ function sample!(
     draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
     stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
-    trajectorylength_adapter=TrajectorylengthChEES(sampler.trajectorylength, sampler.dims, warmup),
+    trajectorylength_adapter=TrajectorylengthChEES(
+        sampler.trajectorylength, sampler.dims, warmup
+    ),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
     kwargs...,
@@ -79,7 +81,9 @@ function sample!(
     draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
     stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
-    trajectorylength_adapter=TrajectorylengthSNAPER(sampler.trajectorylength, sampler.dims, warmup),
+    trajectorylength_adapter=TrajectorylengthSNAPER(
+        sampler.trajectorylength, sampler.dims, warmup
+    ),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
     adaptation_schedule=SGAAdaptationSchedule(warmup),
@@ -107,7 +111,8 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
     u = halton(m)
     trajectorylength_mean = sampler.trajectorylength[1]
     tld = get(kwargs, :trajectorylength_distribution, :uniform)
-    trajectorylength = tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
+    trajectorylength =
+        tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
     stepsize = sampler.stepsize[1]
     steps = trajectorylength / stepsize
     steps = isfinite(steps) ? steps : 1
@@ -128,7 +133,7 @@ function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...
                 1000;
                 kwargs...,
             )
-            info = (; info..., trajectorylength = trajectorylength_mean)
+            info = (; info..., trajectorylength=trajectorylength_mean)
             record!(sampler, trace, info, m + 1, chain)
         end
     end

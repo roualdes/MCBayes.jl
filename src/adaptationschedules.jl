@@ -182,7 +182,6 @@ function adapt!(
         update!(metric_adapter, positions, ldg; kwargs...)
         set!(sampler, metric_adapter; kwargs...)
 
-
         if :pca in fieldnames(typeof(sampler))
             metric = sqrt.(sampler.metric[:, 1])
             metric ./= maximum(metric)
@@ -231,8 +230,8 @@ function adapt!(
             set!(sampler, trajectorylength_adapter; kwargs...)
         end
     else
-        set!(sampler, stepsize_adapter; smoothed = true, kwargs...)
-        set!(sampler, trajectorylength_adapter; smoothed = true, kwargs...)
+        set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
+        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
 

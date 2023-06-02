@@ -9,13 +9,12 @@ function OnlinePCA(T, d, l)
     return OnlinePCA(l, zeros(Int, 1), randn(T, d))
 end
 
-OnlinePCA(d, l = 2.0) = OnlinePCA(Float64, d, l)
+OnlinePCA(d, l=2.0) = OnlinePCA(Float64, d, l)
 
 """
 Assumes x is centered
 """
 function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
-
     dims, chains = size(x)
     d = length(opca.pc)
 
