@@ -1,5 +1,8 @@
 abstract type AbstractSGA{T} <: AbstractSampler{T} end
 
+# TODO am I missing negating the momentum on rejections, what of
+# implications for trajectorylength_adaptation?
+
 struct ChEES{T} <: AbstractSGA{T}
     metric::Matrix{T}
     pca::Vector{T}

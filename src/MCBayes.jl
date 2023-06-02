@@ -32,6 +32,7 @@ include("meads.jl")
 include("mala.jl")
 include("malt.jl")
 include("sga.jl")
+include("xhmc.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -47,6 +48,7 @@ export Stan,
     MALT,
     ChEES,
     SNAPER,
+    XHMC,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,

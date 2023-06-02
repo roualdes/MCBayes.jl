@@ -1,3 +1,90 @@
+function xhmc!(
+    position,
+    position_next,
+    momentum,
+    ldg,
+    rng,
+    dims,
+    metric,
+    stepsize,
+    steps,
+    noise,
+    K,
+    maxdeltaH;
+    kwargs...,
+)
+    T = eltype(position)
+    q = copy(position)
+    q_first = similar(q)
+    
+    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, dims)
+    p_first = similar(p)
+    
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
+
+    u = rand(rng, T)
+    a = zero(T)
+    k = 0
+    divergent = false
+    acceptstat = zero(T)
+    
+    s = steps
+    ss = stepsize
+    f = 10
+    while u > a && k < K
+        k += 1
+
+        ld, gradient = leapfrog!(q, p, ldg, gradient, ss .* sqrt.(metric), s; kwargs...)
+
+        H = hamiltonian(ld, p)
+        isnan(H) && (H = typemax(T))
+        divergent = (H - H0) > maxdeltaH
+
+        if divergent
+            a = zero(T)
+            q_first .= q
+            p_first .= p
+            break
+        end
+
+        a = min(1, max(a, exp(H0 - H)))
+        H0 = H
+        if k == 1
+            acceptstat = a
+            q_first .= q
+            p_first .= p
+        end
+
+        s *= f
+        ss /= f
+    end
+
+    accepted = u <= a
+    if accepted
+        position_next .= q
+        momentum .= p
+    else
+        position_next .= position
+        momentum .*= -1
+    end
+
+    return (;
+            accepted,
+            divergent,
+            stepsize,
+            steps,
+            noise,
+            ld,
+            acceptstat,
+            energy=hamiltonian(ld, p),
+            momentum=p_first,
+            position=q_first,
+            retries=k,
+    )
+end
+
 function malt!(
     position,
     position_next,
