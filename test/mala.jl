@@ -1,6 +1,6 @@
-@testset "Stan" begin
-    iterations = 5_000
-    warmup = 2_000
+@testset "MALA" begin
+    iterations = 10_000
+    warmup = 10_000
 
     @testset "arK-arK" begin
         model_name = model_names[1]
@@ -8,8 +8,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -22,8 +22,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -36,8 +36,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -50,11 +50,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.99)
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(
-            stan, ldg; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
-        )
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -67,10 +64,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; iterations=iterations, warmup=warmup)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -84,8 +81,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -101,11 +98,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.99)
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(
-            stan, ldg; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
-        )
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup)
         true_means = expectations[model_name][:true_mean]
@@ -118,8 +112,8 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        mala = MALA(dims)
+        draws, diagnostics, rngs = sample!(mala, ldg; warmup=warmup, iterations=iterations)
 
         constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
         true_means = expectations[model_name][:true_mean]

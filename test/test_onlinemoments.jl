@@ -6,7 +6,7 @@
     v = reshape(var(x; dims=1, corrected=false), (dims, chains))
 
     # separate moments for each chain of x
-    om = OnlineMoments(dims, chains)
+    om = MCBayes.OnlineMoments(dims, chains)
 
     for n in 1:N
         MCBayes.update!(om, x[n, :, :])
@@ -15,21 +15,16 @@
     @test om.n[1] == N
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
-    @test isapprox(MCBayes.optimum(om; regularized=false), om.v)
-    w = reshape(om.n ./ (om.n .+ 5), 1, :)
-    v = @. w * om.v + (1 - w) * 1e-3
-    @test isapprox(MCBayes.optimum(om), v)
 
     MCBayes.reset!(om)
     @test iszero(om.n)
     @test iszero(om.m)
     @test iszero(om.v)
 
+    # same moments for all chains of x
     m = reshape(mean(x; dims=(1, 3)), dims)
     v = reshape(var(x; dims=(1, 3), corrected=false), dims)
-
-    # same moments for all chains of x
-    om = OnlineMoments(dims)
+    om = MCBayes.OnlineMoments(dims)
 
     for n in 1:N
         MCBayes.update!(om, x[n, :, :])
@@ -38,8 +33,4 @@
     @test om.n[1] == N * chains
     @test isapprox(om.m, m)
     @test isapprox(om.v, v)
-    @test isapprox(MCBayes.optimum(om; regularized=false), om.v)
-    w = reshape(om.n ./ (om.n .+ 5), 1, :)
-    v = @. w * om.v + (1 - w) * 1e-3
-    @test isapprox(MCBayes.optimum(om), v)
 end

@@ -1,49 +1,140 @@
-abstract type AbstractSGA{T} <: AbstractSamlper{T} end
+abstract type AbstractSGA{T} <: AbstractSampler{T} end
 
-mutable struct ChEES{T<:AbstractFloat} <: AbstractSGA
-    γ::T
-    adam_ε::Adam{T}
-    adam_τ::Adam{T}
-    metric::Vector{T}
-    om::OnlineMoments{T}
-    const dims::Int
-    const chains::Int
-    const maxdeltaH::T
-    const maxtreedepth::Int
+struct ChEES{T} <: AbstractSGA{T}
+    metric::Matrix{T}
+    pca::Vector{T}
+    stepsize::Vector{T}
+    trajectorylength::Vector{T}
+    dims::Int
+    chains::Int
 end
 
-mutable struct SNAPER{T<:AbstractFloat} <: AbstractSGA
-    γ::T
-    adam_ε::Adam{T}
-    adam_τ::Adam{T}
-    metric::Vector{T}
-    om::OnlineMoments{T}
-    const dims::Int
-    const chains::Int
-    const maxdeltaH::T
-    const maxtreedepth::Int
+function ChEES(
+    dims,
+    chains=12,
+    T=Float64;
+    metric=ones(T, dims, 1),
+    stepsize=ones(T, 1),
+    trajectorylength=ones(T, 1),
+)
+    D = convert(Int, dims)::Int
+    return ChEES(metric, zeros(T, dims), stepsize, trajectorylength, D, chains)
 end
 
-function transition!(sga::AbstractSGA, i, draws; kwargs...)
-    kernel!(sga, i, draws)
-    nt = kwargs[:nt]
-    @sync for it in 1:nt
-        Threads.@spawn for c in it:nt:kwargs[:chains]
-            info = kernel!(sga, i, draws; kwargs...)
-            update_info!(sga, i, info)
+function sample!(
+    sampler::ChEES,
+    ldg;
+    iterations=2000,
+    warmup=iterations,
+    draws_initializer=DrawsInitializerAdam(),
+    stepsize_initializer=StepsizeInitializerSGA(),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
+    trajectorylength_adapter=TrajectorylengthChEES(
+        sampler.trajectorylength, sampler.dims, warmup
+    ),
+    metric_adapter=MetricOnlineMoments(sampler.metric),
+    adaptation_schedule=SGAAdaptationSchedule(warmup),
+    kwargs...,
+)
+    return run_sampler!(
+        sampler,
+        ldg;
+        iterations,
+        warmup,
+        draws_initializer,
+        stepsize_initializer,
+        stepsize_adapter,
+        trajectorylength_adapter,
+        metric_adapter,
+        adaptation_schedule,
+        kwargs...,
+    )
+end
+
+struct SNAPER{T} <: AbstractSGA{T}
+    metric::Matrix{T}
+    pca::Vector{T}
+    stepsize::Vector{T}
+    trajectorylength::Vector{T}
+    dims::Int
+    chains::Int
+end
+
+function SNAPER(
+    dims,
+    chains=12,
+    T=Float64;
+    metric=ones(T, dims, 1),
+    pca=zeros(T, dims),
+    stepsize=ones(T, 1),
+    trajectorylength=ones(T, 1),
+)
+    D = convert(Int, dims)::Int
+    return SNAPER(metric, pca, stepsize, trajectorylength, D, chains)
+end
+
+function sample!(
+    sampler::SNAPER,
+    ldg;
+    iterations=2000,
+    warmup=iterations,
+    draws_initializer=DrawsInitializerAdam(),
+    stepsize_initializer=StepsizeInitializerSGA(),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
+    trajectorylength_adapter=TrajectorylengthSNAPER(
+        sampler.trajectorylength, sampler.dims, warmup
+    ),
+    metric_adapter=MetricOnlineMoments(sampler.metric),
+    pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
+    adaptation_schedule=SGAAdaptationSchedule(warmup),
+    kwargs...,
+)
+    return run_sampler!(
+        sampler,
+        ldg;
+        iterations,
+        warmup,
+        draws_initializer,
+        stepsize_initializer,
+        stepsize_adapter,
+        trajectorylength_adapter,
+        metric_adapter,
+        pca_adapter,
+        adaptation_schedule,
+        kwargs...,
+    )
+end
+
+function transition!(sampler::AbstractSGA, m, ldg, draws, rngs, trace; kwargs...)
+    nt = get(kwargs, :threads, Threads.nthreads())
+    chains = size(draws, 3)
+    u = halton(m)
+    trajectorylength_mean = sampler.trajectorylength[1]
+    tld = get(kwargs, :trajectorylength_distribution, :uniform)
+    trajectorylength =
+        tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
+    stepsize = sampler.stepsize[1]
+    steps = trajectorylength / stepsize
+    steps = isfinite(steps) ? steps : 1
+    steps = round(Int64, clamp(steps, 1, 1000))
+    metric = sampler.metric[:, 1]
+    metric ./= maximum(metric)
+    Threads.@threads for it in 1:nt
+        for chain in it:nt:chains
+            @views info = hmc!(
+                draws[m, :, chain],
+                draws[m + 1, :, chain],
+                ldg,
+                rngs[chain],
+                sampler.dims,
+                metric,
+                stepsize,
+                steps,
+                1000;
+                kwargs...,
+            )
+            info = (; info..., trajectorylength=trajectorylength_mean)
+            record!(sampler, trace, info, m + 1, chain)
         end
     end
-    return adapt_chains!(sga, i, draws)
-end
-
-function adapt_chains!(sga::SGA, i, draws; kwargs...)
-    # copy from MCBayes/src/sga.jl
-    # ...
-    return adapt_metric!(sga, i, draws; kwargs...)
-end
-
-function adapt_metric!(sga::SGA, i, draws; kwargs...)
-    update!(sga.om, draws[i, :, :]; kwargs...)
-    η = i^sga.γ               # ημ = 1 / (ceil(numchains * i / sga.κ) + 1)
-    return sga.metric .= η .* sga.om.v .+ (1 - η) .* sga.metric
 end

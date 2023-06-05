@@ -2,45 +2,110 @@ abstract type AbstractMetricAdapter{T} end
 
 Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
-function set_metric!(sampler, ma::AbstractMetricAdapter; kwargs...)
-    return sampler.metric .= optimum(ma; kwargs...)
+function set!(sampler, ma::AbstractMetricAdapter, args...; kwargs...)
+    sampler.metric .= ma.metric
 end
 
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     metric::Matrix{T}
+    alpha::T
 end
 
-function MetricOnlineMoments(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
+function MetricOnlineMoments(
+    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
-    return MetricOnlineMoments(om, initial_metric)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricOnlineMoments(om, initial_metric, smoothing_factor)
 end
 
-function update!(mom::MetricOnlineMoments, x::AbstractMatrix; kwargs...)
-    return update!(mom.om, x; kwargs...)
+function update!(
+    mom::MetricOnlineMoments{T},
+    x::AbstractMatrix,
+    args...;
+    metric_regularize=true,
+    metric_smooth=true,
+    kwargs...,
+) where {T}
+    update!(mom.om, x; kwargs...)
+    if metric_regularize
+        w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
+        mom.metric .= w .* mom.om.v .+ (1 .- w) .* convert(T, 1e-3)::T
+    end
+    w = mom.alpha + (1 - metric_smooth) * (1 - mom.alpha)
+    mom.metric .= w .* mom.om.v .+ (1 - w) .* mom.metric
 end
 
-function optimum(mom::MetricOnlineMoments; kwargs...)
-    return optimum(mom.om; kwargs...)
-end
-
-function reset!(mom::MetricOnlineMoments; kwargs...)
-    return reset!(mom.om; kwargs...)
+function reset!(mom::MetricOnlineMoments, args...; kwargs...)
+    reset!(mom.om; kwargs...)
 end
 
 struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     metric::Matrix{T}
 end
 
-function MetricConstant(initial_metric::AbstractMatrix{T}; kwargs...) where {T}
+function MetricConstant(initial_metric::AbstractMatrix, args...; kwargs...)
     return MetricConstant(initial_metric)
 end
 
-function update!(mc::MetricConstant, x::AbstractMatrix; kwargs...) end
+function update!(mc::MetricConstant, args...; kwargs...) end
 
-function optimum(mc::MetricConstant; kwargs...)
-    return mc.metric
+function reset!(mc::MetricConstant, args...; kwargs...) end
+
+struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
+    metric::Matrix{T}
 end
 
-function reset!(mc::MetricConstant; kwargs...) end
+function MetricECA(initial_metric::AbstractMatrix, args...; kwargs...)
+    return MetricECA(initial_metric)
+end
+
+function update!(meca::MetricECA, sigma, idx, args...; kwargs...)
+    meca.metric[:, idx] .= sigma
+end
+
+function set!(sampler, meca::MetricECA, idx, args...; kwargs...)
+    sampler.metric[:, idx] .= meca.metric[:, idx]
+end
+
+struct MetricFisherDivergence{T<:AbstractFloat} <: AbstractMetricAdapter{T}
+    om::OnlineMoments{T}
+    og::OnlineMoments{T}
+    metric::Matrix{T}
+    alpha::T
+end
+
+function MetricFisherDivergence(
+    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+) where {T}
+    dims, metrics = size(initial_metric)
+    om = OnlineMoments(T, dims, metrics)
+    og = OnlineMoments(T, dims, metrics)
+    smoothing_factor = convert(T, metric_smoothing_factor)
+    return MetricFisherDivergence(om, og, initial_metric, smoothing_factor)
+end
+
+function update!(
+    mfd::MetricFisherDivergence,
+    x::AbstractMatrix,
+    ldg,
+    args...;
+    metric_smooth=true,
+    kwargs...,
+)
+    grads = similar(x)
+    for c in axes(grads, 2)
+        _, grads[:, c] = ldg(x[:, c]; kwargs...)
+    end
+    update!(mfd.om, x; kwargs...)
+    update!(mfd.og, grads; kwargs...)
+    w = mfd.alpha + (1 - metric_smooth) * (1 - mfd.alpha)
+    mfd.metric .= w .* sqrt.(mfd.om.v ./ mfd.og.v) .+ (1 - w) .* mfd.metric
+end
+
+function reset!(mfd::MetricFisherDivergence, args...; kwargs...)
+    reset!(mfd.om; kwargs...)
+    reset!(mfd.og; kwargs...)
+end

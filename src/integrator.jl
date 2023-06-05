@@ -1,7 +1,6 @@
-# TODO(ear) use z::PSPoint instead of position, momentum
 function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...)
     ld = zero(eltype(position))
-    @. momentum += stepsize * gradient / 2
+    @. momentum += 0.5 * stepsize * gradient
 
     for step in 1:steps
         @. position += stepsize * momentum
@@ -11,6 +10,24 @@ function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...
         end
     end
 
-    @. momentum += stepsize * gradient / 2
+    @. momentum += 0.5 * stepsize * gradient
     return ld, gradient
+end
+
+function langevin_trajectory!(
+    position, momentum, ldg, gradient, stepsize, steps, noise; kwargs...
+)
+    T = eltype(position)
+    Δ = zero(T)
+    ld = zero(T)
+    ξ = randn(length(momentum), steps)
+
+    for step in 1:steps
+        @. @views momentum = noise * momentum + sqrt(1 - noise^2) * ξ[:, step]
+        Δ += 0.5 * (momentum' * momentum)
+        ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
+        Δ -= 0.5 * (momentum' * momentum)
+    end
+
+    return Δ, ld
 end

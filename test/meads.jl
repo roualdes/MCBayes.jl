@@ -1,6 +1,6 @@
-@testset "Stan" begin
-    iterations = 5_000
-    warmup = 2_000
+@testset "MEADS" begin
+    iterations = 2_000
+    warmup = 500
 
     @testset "arK-arK" begin
         model_name = model_names[1]
@@ -8,10 +8,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -22,12 +22,12 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means)
+        @test check_means(constrained_draws, true_means, z=6)
     end
 
     @testset "garch-garch11" begin
@@ -36,10 +36,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -50,15 +50,12 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.99)
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(
-            stan, ldg; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
-        )
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
-        @test check_means(constrained_draws, true_means)
+        @test check_means(constrained_draws, true_means, z=7)
     end
 
     @testset "highd_mvnormal" begin
@@ -67,10 +64,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -84,10 +81,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 
@@ -101,13 +98,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        ssda = StepsizeDualAverage(ones(4); δ=0.99)
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(
-            stan, ldg; stepsize_adapter=ssda, warmup=warmup, iterations=iterations
-        )
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup)
+        constrained_draws = constrain_draws(bsm, draws, warmup; thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
     end
@@ -118,10 +112,10 @@
         dims = BS.param_unc_num(bsm)
         ldg = prepare_log_density_gradient(bsm)
 
-        stan = Stan(dims)
-        draws, diagnostics, rngs = sample!(stan, ldg; warmup=warmup, iterations=iterations)
+        meads = MEADS(dims)
+        draws, diagnostics, rngs = sample!(meads, ldg; warmup=warmup, iterations=iterations)
 
-        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true)
+        constrained_draws = constrain_draws(bsm, draws, warmup; include_tp=true, thin=10)
         true_means = expectations[model_name][:true_mean]
         @test check_means(constrained_draws, true_means)
 

@@ -3,7 +3,6 @@ abstract type AbstractStan{T} <: AbstractSampler{T} end
 struct Stan{T} <: AbstractStan{T}
     metric::Matrix{T}
     stepsize::Vector{T}
-    seed::Vector{Int}
     dims::Int
     chains::Int
     maxtreedepth::Int
@@ -24,82 +23,58 @@ function Stan(
     T=Float64;
     metric=ones(T, dims, chains),
     stepsize=ones(T, chains),
-    seed=rand(1:typemax(Int), chains),
     maxtreedepth=10,
     maxdeltaH=convert(T, 1000),
 )
     D = convert(Int, dims)::Int
-    return Stan(metric, stepsize, seed, D, chains, maxtreedepth, maxdeltaH)
+    return Stan(metric, stepsize, D, chains, maxtreedepth, maxdeltaH)
 end
 
-"""
-    sample!(sampler::Stan, ldg)
-
-Sample with Stan sampler object.  User must provide a function `ldg(position;
-kwargs...)` which accepts `position::Vector` and returns a tuple containing
-the evaluation of the joint log density function and a vector of the gradient,
-each evaluated at the argument `position`.  The remaining keyword arguments
-attempt to replicate [Stan](https://mc-stan.org/) defaults.
-"""
 function sample!(
-    sampler::Stan{T},
+    sampler::Stan,
     ldg;
     iterations=1000,
-    warmup=1000,
-    rngs=Random.Xoshiro.(sampler.seed),
-    draws_initializer=:stan,
+    warmup=iterations,
+    draws_initializer=DrawsInitializerStan(),
+    stepsize_initializer=StepsizeInitializerStan(),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
-    trajectorylength_adapter=TrajectorylengthConstant(zeros(sampler.chains)),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
-) where {T<:AbstractFloat}
-    M = iterations + warmup
-    draws = Array{T,3}(undef, M + 1, sampler.dims, sampler.chains)
-    diagnostics = trace(sampler, M + 1)
-
-    initialize_draws!(draws_initializer, draws, rngs, ldg; kwargs...)
-
-    @views initialize_stepsize!(
-        stepsize_adapter, sampler.metric, rngs, ldg, draws[1, :, :]; kwargs...
+)
+    return run_sampler!(
+        sampler,
+        ldg;
+        iterations,
+        warmup,
+        draws_initializer,
+        stepsize_initializer,
+        stepsize_adapter,
+        metric_adapter,
+        adaptation_schedule,
+        kwargs...,
     )
-    set_stepsize!(sampler, stepsize_adapter; kwargs...)
-
-    for m in 1:M
-        transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
-
-        adapt!(
-            sampler,
-            adaptation_schedule,
-            diagnostics,
-            m,
-            ldg,
-            draws,
-            rngs,
-            metric_adapter,
-            stepsize_adapter,
-            trajectorylength_adapter;
-            kwargs...,
-        )
-    end
-    return draws, diagnostics, rngs
 end
 
 function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
-    for chain in axes(draws, 3) # TODO multi-thread-able
-        @views info = stan_kernel!(
-            draws[m, :, chain],
-            draws[m + 1, :, chain],
-            rngs[chain],
-            sampler.dims,
-            sampler.metric[:, chain],
-            sampler.stepsize[chain],
-            sampler.maxdeltaH,
-            sampler.maxtreedepth,
-            ldg;
-            kwargs...,
-        )
-        record!(trace, info, m + 1, chain)
+    nt = get(kwargs, :threads, Threads.nthreads())
+    chains = size(draws, 3)
+    @sync for it in 1:nt
+        Threads.@spawn for chain in it:nt:chains
+            @views info = stan_kernel!(
+                draws[m, :, chain],
+                draws[m + 1, :, chain],
+                rngs[chain],
+                sampler.dims,
+                sampler.metric[:, chain],
+                sampler.stepsize[chain],
+                sampler.maxdeltaH,
+                sampler.maxtreedepth,
+                ldg;
+                kwargs...,
+            )
+            record!(sampler, trace, info, m + 1, chain)
+        end
     end
 end
 
@@ -411,56 +386,4 @@ function buildtree!(
     persist &= stancriterion(psharpinitend, psharpend, rhosubtree)
 
     return persist, nleapfrog, logsumweight, α
-end
-
-function adapt!(
-    sampler,
-    schedule::WindowedAdaptationSchedule,
-    trace,
-    m,
-    ldg,
-    draws,
-    rngs,
-    metric_adapter,
-    stepsize_adapter,
-    trajectorylength_adapter;
-    kwargs...,
-)
-    warmup = schedule.warmup
-    if m <= warmup
-        accept_stats = trace.acceptstat[m, :]
-        update!(stepsize_adapter, accept_stats; warmup, kwargs...)
-        set_stepsize!(sampler, stepsize_adapter; kwargs...)
-
-        # TODO(ear) this is attempting to plan ahead;
-        # to actually use update!() will require
-        # more arguments, for additional information on which
-        # the trajectorylength could be learned
-        update!(trajectorylength_adapter; kwargs...)
-        set_trajectorylength!(sampler, trajectorylength_adapter; kwargs...)
-
-        if schedule.firstwindow <= m <= schedule.lastwindow
-            @views update!(metric_adapter, draws[m + 1, :, :]; kwargs...)
-        end
-
-        if m == schedule.closewindow
-            @views initialize_stepsize!(
-                stepsize_adapter,
-                optimum(metric_adapter),
-                rngs,
-                ldg,
-                draws[m + 1, :, :];
-                kwargs...,
-            )
-            set_stepsize!(sampler, stepsize_adapter; kwargs...)
-            reset!(stepsize_adapter; kwargs...)
-
-            set_metric!(sampler, metric_adapter; kwargs...)
-            reset!(metric_adapter)
-
-            calculate_nextwindow!(schedule)
-        end
-    else
-        set_stepsize!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-    end
 end

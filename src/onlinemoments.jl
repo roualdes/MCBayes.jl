@@ -1,9 +1,15 @@
+# TODO break this up into mean and variance
+# to enable one without the other, then
+# OnlineMoments is just the union of mean and var
 struct OnlineMoments{T<:AbstractFloat}
     n::Vector{Int}
     m::Matrix{T}
     v::Matrix{T}
 end
 
+Base.eltype(::OnlineMoments{T}) where {T} = T
+
+# TODO T should come last to be more like Adam
 function OnlineMoments(T, d, c)
     return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
 end
@@ -19,7 +25,7 @@ determines whether or not any updates will actually be applied.
 OnlineMoments(d, c=1) = OnlineMoments(Float64, d, c)
 
 """
-    update!(om::OnlineMoments, x::Matrix; kwargs...)
+    update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
 
 Update om's mean and variance `Matrix`es with the data contained in x.
 The rows of x and om.m (and thus om.v) must match.  The columns of x
@@ -57,19 +63,4 @@ function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
     om.v .= 0
-end
-
-function optimum(om::OnlineMoments; regularized=true, kwargs...)
-    T = eltype(om.v)
-    if om.n[1] > 1
-        v = if regularized
-            w = reshape(convert.(T, om.n ./ (om.n .+ 5)), 1, :)
-            @. w * om.v + (1 - w) * convert(T, 1e-3)
-        else
-            om.v
-        end
-        return v
-    else
-        return ones(T, size(om.v))
-    end
 end
