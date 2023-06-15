@@ -44,7 +44,7 @@ function sample!(
     stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
-    trajectorylength_adapter=TrajectorylengthMALT(
+    trajectorylength_adapter=TrajectorylengthSNAPER(
         sampler.trajectorylength, sampler.dims, warmup
     ),
     damping_adapter=DampingMALT(sampler.damping),
@@ -73,8 +73,13 @@ end
 function transition!(sampler::XHMC, m, ldg, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
+    u = halton(m)
+    trajectorylength_mean = sampler.trajectorylength[1]
+    tld = get(kwargs, :trajectorylength_distribution, :uniform)
+    trajectorylength =
+        tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
     stepsize = sampler.stepsize[1]
-    trajectorylength = sampler.trajectorylength[1]
+    # trajectorylength = sampler.trajectorylength[1]
     steps = trajectorylength / stepsize
     steps = ifelse(isfinite(steps), steps, 1)
     steps = round(Int64, clamp(steps, 1, 1000))
@@ -92,7 +97,7 @@ function transition!(sampler::XHMC, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.dims,
                 metric,
                 stepsize,
-                steps,
+                1, # steps,
                 noise,
                 sampler.K,
                 1000;
