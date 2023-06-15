@@ -41,7 +41,7 @@ function sample!(
     warmup=iterations,
     draws_initializer=DrawsInitializerAdam(),
     stepsize_initializer=StepsizeInitializerSGA(),
-    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
+    stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.6),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
     trajectorylength_adapter=TrajectorylengthSNAPER(
@@ -78,14 +78,16 @@ function transition!(sampler::XHMC, m, ldg, draws, rngs, trace; kwargs...)
     tld = get(kwargs, :trajectorylength_distribution, :uniform)
     trajectorylength =
         tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
-    stepsize = sampler.stepsize[1]
     # trajectorylength = sampler.trajectorylength[1]
+    stepsize = sampler.stepsize[1]
     steps = trajectorylength / stepsize
     steps = ifelse(isfinite(steps), steps, 1)
     steps = round(Int64, clamp(steps, 1, 1000))
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
     noise = sampler.noise[1]
+    warmup = get(kwargs, :warmup, div(size(draws, 1), 2))
+    K = ifelse(m < warmup, 1, sampler.K)
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             @views info = xhmc!(
@@ -97,9 +99,9 @@ function transition!(sampler::XHMC, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.dims,
                 metric,
                 stepsize,
-                1, # steps,
+                steps,
                 noise,
-                sampler.K,
+                K,
                 1000;
                 kwargs...,
             )

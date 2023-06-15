@@ -28,7 +28,7 @@ function xhmc!(
     acceptstat = zero(T)
     H = zero(T)
 
-    while u => a && k < K
+    while u >= a && k < K
         k += 1
 
         ld, gradient = leapfrog!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...)
@@ -61,7 +61,7 @@ function xhmc!(
             noise,
             ld,
             acceptstat,
-            energy=hamiltonian(ld, p),
+            energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
             momentum=p,
             position=q,
             retries=k,
@@ -112,7 +112,7 @@ function malt!(
         noise,
         ld,
         acceptstat=a,
-        energy=hamiltonian(ld, p),
+        energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
         momentum=p,
         position=q,
     )
