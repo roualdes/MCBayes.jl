@@ -31,7 +31,7 @@ function xhmc!(
     while u >= a && k < K
         k += 1
 
-        ld, gradient = leapfrog!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...)
+        ld, gradient = minimal_norm!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...)
 
         H = hamiltonian(ld, p)
         isnan(H) && (H = typemax(T))

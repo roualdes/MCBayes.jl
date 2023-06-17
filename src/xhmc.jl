@@ -1,3 +1,4 @@
+# adapted from https://github.com/vitaminace33/mscripts/blob/master/tools/xhmc.m
 abstract type AbstractXHMC{T} <: AbstractSampler{T} end
 
 struct XHMC{T} <: AbstractXHMC{T}
@@ -78,7 +79,6 @@ function transition!(sampler::XHMC, m, ldg, draws, rngs, trace; kwargs...)
     tld = get(kwargs, :trajectorylength_distribution, :uniform)
     trajectorylength =
         tld == :uniform ? 2u * trajectorylength_mean : -log(u) * trajectorylength_mean
-    # trajectorylength = sampler.trajectorylength[1]
     stepsize = sampler.stepsize[1]
     steps = trajectorylength / stepsize
     steps = ifelse(isfinite(steps), steps, 1)

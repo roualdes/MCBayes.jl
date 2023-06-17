@@ -31,3 +31,23 @@ function langevin_trajectory!(
 
     return Δ, ld
 end
+
+const lambda = 0.1931833275037836
+
+function minimal_norm!(
+    position, momentum, ldg, gradient, stepsize, steps; kwargs...
+)
+
+    ld = zero(eltype(position))
+
+    for step in 1:steps
+        @. momentum += lambda * stepsize * gradient
+        @. position += 0.5 * stepsize * momentum
+        ld, gradient = ldg(position; kwargs...)
+        @. momentum += (1 - 2 * lambda) * stepsize * gradient
+        @. position += 0.5 * stepsize * momentum
+        ld, gradient = ldg(position; kwargs...)
+        @. momentum += lambda * stepsize * gradient
+    end
+    return ld, gradient
+end
