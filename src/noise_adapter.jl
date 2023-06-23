@@ -49,7 +49,7 @@ function NoiseConstant(initial_noise::AbstractVector; kwargs...)
     return NoiseConstant(initial_noise, initial_noise)
 end
 
-function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
+# function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
 
 function update!(nc::NoiseConstant, args...; kwargs...) end
 

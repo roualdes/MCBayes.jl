@@ -184,3 +184,48 @@ function record!(
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
 end
+
+function trace(sampler::XHMC{T}, iterations) where {T}
+    chains = sampler.chains
+    dims = sampler.dims
+    return (;
+        acceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            steps=zeros(Int, iterations, 1),
+            damping=zeros(T, iterations, chains),
+            noise=zeros(T, iterations, chains),
+            trajectorylength=zeros(T, iterations, chains),
+            ld=zeros(T, iterations, chains),
+            previousmomentum=zeros(T, dims, chains),
+            momentum=zeros(T, dims, chains),
+            position=zeros(T, dims, chains),
+            retries=zeros(Int, sampler.K, chains),
+    )
+end
+
+function record!(sampler::XHMC{T}, trace::NamedTuple, info, iteration, chain) where {T}
+    keys = (
+        :accepted,
+        :acceptstat,
+        :divergence,
+        :energy,
+        :stepsize,
+        :noise,
+        :damping,
+        :ld,
+        :trajectorylength,
+    )
+    for k in keys
+        if haskey(info, k)
+            trace[k][iteration, chain] = info[k]
+        end
+    end
+    trace[:steps][iteration] = info[:steps]
+    trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
+    trace[:momentum][:, chain] .= info[:momentum]
+    trace[:position][:, chain] .= info[:position]
+    trace[:retries][info[:retries], chain] += 1
+end

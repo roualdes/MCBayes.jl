@@ -32,6 +32,7 @@ include("meads.jl")
 include("mala.jl")
 include("malt.jl")
 include("sga.jl")
+include("xhmc.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -47,6 +48,7 @@ export Stan,
     MALT,
     ChEES,
     SNAPER,
+    XHMC,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
@@ -160,7 +162,7 @@ function run_sampler!(
     )
 
     for m in 1:M
-        transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
+        transition!(sampler, m, ldg, draws, rngs, diagnostics; warmup, kwargs...)
 
         # TODO adaptations effectively should be unique to each algorithm
         # adaptation schedules don't generalize well

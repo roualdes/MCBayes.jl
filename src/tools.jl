@@ -1,3 +1,73 @@
+function xhmc!(
+    position,
+    position_next,
+    momentum,
+    ldg,
+    rng,
+    dims,
+    metric,
+    stepsize,
+    steps,
+    noise,
+    K,
+    maxdeltaH;
+    kwargs...,
+)
+    T = eltype(position)
+    q = copy(position)
+    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, dims)
+
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
+
+    u = rand(rng, T)
+    a = zero(T)
+    acceptstat = zero(T)
+    k = 0
+    divergent = false
+    H = zero(T)
+
+    while u > a && k < K
+        k += 1
+        ld, gradient = minimal_norm!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps;
+                                     kwargs...)
+
+        H = hamiltonian(ld, p)
+        isnan(H) && (H = typemax(T))
+        divergent = H - H0 > maxdeltaH
+
+        a = min(1, max(a, exp(H0 - H)))
+        H0 = H
+        if k == 1
+            acceptstat = a
+        end
+    end
+
+    accepted = u <= a
+    if accepted
+        position_next .= q
+        momentum .= p
+    else
+        position_next .= position
+        momentum .*= -1
+    end
+
+    return (;
+            accepted,
+            divergent,
+            stepsize,
+            steps,
+            noise,
+            ld,
+            acceptstat,
+            energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
+            momentum=p,
+            position=q,
+            retries=k,
+    )
+end
+
 function malt!(
     position,
     position_next,
@@ -42,7 +112,7 @@ function malt!(
         noise,
         ld,
         acceptstat=a,
-        energy=hamiltonian(ld, p),
+        energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
         momentum=p,
         position=q,
     )
@@ -65,7 +135,7 @@ function hmc!(
 
     H = hamiltonian(ld, p)
     isnan(H) && (H = typemax(T))
-    divergent = (H - H0) > maxdeltaH
+    divergent = H - H0 > maxdeltaH
 
     a = min(1, exp(H0 - H))
     accepted = rand(rng, T) < a
