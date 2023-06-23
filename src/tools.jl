@@ -23,15 +23,15 @@ function xhmc!(
 
     u = rand(rng, T)
     a = zero(T)
+    acceptstat = zero(T)
     k = 0
     divergent = false
-    acceptstat = zero(T)
     H = zero(T)
 
-    while u >= a && k < K
+    while u > a && k < K
         k += 1
-
-        ld, gradient = minimal_norm!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...)
+        ld, gradient = minimal_norm!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps;
+                                     kwargs...)
 
         H = hamiltonian(ld, p)
         isnan(H) && (H = typemax(T))
@@ -44,7 +44,7 @@ function xhmc!(
         end
     end
 
-    accepted = u < a
+    accepted = u <= a
     if accepted
         position_next .= q
         momentum .= p
