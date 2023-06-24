@@ -280,7 +280,7 @@ function sampler_trajectorylength_gradient(
     tlc::TrajectorylengthLDG, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
 )
     t = tlc.trajectorylength[1] + stepsize
-    h = halton(m)
+    h = 1 # halton(m)
     T = eltype(positions)
     dims, chains = size(positions)
     ghats = zeros(chains)

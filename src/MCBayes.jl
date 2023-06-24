@@ -33,6 +33,7 @@ include("mala.jl")
 include("malt.jl")
 include("sga.jl")
 include("xhmc.jl")
+include("drmala.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -49,6 +50,7 @@ export Stan,
     ChEES,
     SNAPER,
     XHMC,
+    DrMALA,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
