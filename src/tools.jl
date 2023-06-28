@@ -1,3 +1,161 @@
+function drhmc!(
+    position,
+    position_next,
+    momentum,
+    ldg,
+    rng,
+    dims,
+    metric,
+    stepsize,
+    steps,
+    noise,
+    J,
+    reduction_factor,
+    maxdeltaH;
+    kwargs...,
+    )
+    T = eltype(position)
+    q = copy(position)
+    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(rng, T, dims)
+
+    ld, gradient = ldg(q; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
+
+    avec = zeros(T, J)
+    ptries = ones(T, J)
+    ss = stepsize .* sqrt.(metric)
+
+    accepted = false
+    divergent = false
+
+    qj = similar(q)
+    pj = similar(p)
+    jf = 0
+
+    for j in 0:J-1
+        qj .= q
+        ld, gradient = ldg(qj; kwargs...)
+        pj .= p
+
+        a = reduction_factor ^ j
+        ld, gradient = leapfrog!(qj, pj, ldg, gradient, ss ./ a, steps * a; kwargs...)
+
+        Hj = hamiltonian(ld, pj)
+        isnan(Hj) && (Hj = typemax(T))
+        divergent = Hj - H0 > maxdeltaH
+
+        pfac = exp(H0 - Hj)
+        if isapprox(position, qj)
+            pfac = zero(T)
+        end
+
+        jdx = 1:j
+        den = prod(1 .- avec[jdx])
+        (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, ss, reduction_factor, maxdeltaH; kwargs...)
+
+        prob = pfac * num / den
+        if isnan(prob) || isinf(prob)
+            prob = zero(T)
+        end
+
+        avec[j + 1] = min(1, prob)
+        accepted = rand(rng, T) < avec[j + 1]
+        if accepted
+            jf = j
+            break
+        end
+    end
+
+    if accepted
+        position_next .= qj
+        momentum .= pj
+    else
+        position_next .= position
+        momentum .*= -1
+    end
+
+    return (;
+            accepted,
+            divergent,
+            stepsize,
+            steps,
+            noise,
+            ld,
+            acceptstat = avec[jf + 1],
+            energy=hamiltonian(ld, position_next),
+            momentum=pj,
+            position=qj,
+            )
+
+end
+
+function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH; kwargs...)
+    T = eltype(position)
+    avec = zeros(T, J)
+    # ptries = ones(T, J)
+    divergent = false
+
+    qj = similar(position)
+    pj = similar(momentum)
+
+    for j in 0:J-1
+        qj .= position
+        ld, gradient = ldg(qj; kwargs...)
+        pj .= momentum
+
+        a = reduction_factor ^ j
+        ld, gradient = leapfrog!(qj, pj, ldg, gradient, stepsize / a, steps * a; kwargs...)
+
+        Hj = hamiltonian(ld, pj)
+        divergent = Hj - H > maxdeltaH
+
+        pfac = exp(H - Hj)
+        if isapprox(position, qj)
+            pfac = zero(T)
+        end
+
+        prob = zero(T)
+        if j > 0
+            jdx = 1:j
+            den = prod(1 .- avec[jdx]) # * prod(ptries[jdx])
+            (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH)
+            prob = pfac * num / den
+        else
+            prob = pfac
+        end
+
+        if isinf(prob) || isnan(prob)
+            return (;
+                    num = zero(T),
+                    divergent,
+                    )
+        else
+            avec[j + 1] = min(1, prob)
+        end
+
+        # if isinf(pfac) || isnan(pfac)
+        #     ptries[j] = one(T)
+        # else
+        #     ptries[j] = 1 - avec[j]
+        # end
+
+        pa = prod(1 .- avec)
+        if iszero(pa)
+            return (;
+                    num = zero(T),
+                    divergent,
+                    )
+        end
+    end
+
+    return (;
+            num = prod(1 .- avec), #* prod(ptries),
+            divergent,
+    )
+end
+
+
 function xhmc!(
     position,
     position_next,
@@ -15,7 +173,7 @@ function xhmc!(
 )
     T = eltype(position)
     q = copy(position)
-    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(T, dims)
+    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(rng, T, dims)
 
     ld, gradient = ldg(q; kwargs...)
     H0 = hamiltonian(ld, p)

@@ -186,9 +186,7 @@ function adapt!(
             metric = sqrt.(sampler.metric[:, 1])
             metric ./= maximum(metric)
 
-            # TODO need something better/different than metric_adapter.om.m,
-            # MetricConstant doesn't have a .om.m
-            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ metric; kwargs...)
+            update!(pca_adapter, (positions .- metric_mean(metric_adapter)) ./ metric; kwargs...)
             set!(sampler, pca_adapter; kwargs...)
         end
 
@@ -210,24 +208,26 @@ function adapt!(
             set!(sampler, stepsize_adapter; kwargs...)
         end
 
-        if m > trajectorylength_delay
-            update!(
-                trajectorylength_adapter,
-                m + 1,
-                accept_stats,
-                draws[m, :, :],
-                trace.previousmomentum,
-                trace.momentum,
-                trace.position,
-                sampler.stepsize[1],
-                sampler.pca ./ norm(sampler.pca),
-                ldg;
-                kwargs...,
-            )
-            set!(sampler, trajectorylength_adapter; kwargs...)
-        else
-            trajectorylength_adapter.trajectorylength[1] = sampler.stepsize[1]
-            set!(sampler, trajectorylength_adapter; kwargs...)
+        if :trajectorylength in fieldnames(typeof(sampler))
+            if m > trajectorylength_delay
+                update!(
+                    trajectorylength_adapter,
+                    m + 1,
+                    accept_stats,
+                    draws[m, :, :],
+                    trace.previousmomentum,
+                    trace.momentum,
+                    trace.position,
+                    sampler.stepsize[1],
+                    sampler.pca ./ norm(sampler.pca),
+                    ldg;
+                    kwargs...,
+                )
+                set!(sampler, trajectorylength_adapter; kwargs...)
+            else
+                trajectorylength_adapter.trajectorylength[1] = sampler.stepsize[1]
+                set!(sampler, trajectorylength_adapter; kwargs...)
+            end
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
