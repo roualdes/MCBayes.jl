@@ -51,7 +51,7 @@ function drhmc!(
         end
 
         jdx = 1:j
-        den = prod(1 .- avec[jdx])
+        den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
         (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, ss, reduction_factor, maxdeltaH; kwargs...)
 
         prob = pfac * num / den
@@ -60,6 +60,13 @@ function drhmc!(
         end
 
         avec[j + 1] = min(1, prob)
+
+        if isnan(pfac) || isinf(pfac)
+            ptries[j + 1] = one(T)
+        else
+            ptries[j + 1] = 1 - avec[j + 1]
+        end
+        
         accepted = rand(rng, T) < avec[j + 1]
         if accepted
             jf = j
@@ -93,7 +100,7 @@ end
 function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH; kwargs...)
     T = eltype(position)
     avec = zeros(T, J)
-    # ptries = ones(T, J)
+    ptries = ones(T, J)
     divergent = false
 
     qj = similar(position)
@@ -118,7 +125,7 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
         prob = zero(T)
         if j > 0
             jdx = 1:j
-            den = prod(1 .- avec[jdx]) # * prod(ptries[jdx])
+            den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
             (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH)
             prob = pfac * num / den
         else
@@ -134,11 +141,11 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
             avec[j + 1] = min(1, prob)
         end
 
-        # if isinf(pfac) || isnan(pfac)
-        #     ptries[j] = one(T)
-        # else
-        #     ptries[j] = 1 - avec[j]
-        # end
+        if isinf(pfac) || isnan(pfac)
+            ptries[j + 1] = one(T)
+        else
+            ptries[j + 1] = 1 - avec[j + 1]
+        end
 
         pa = prod(1 .- avec)
         if iszero(pa)
@@ -150,7 +157,7 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
     end
 
     return (;
-            num = prod(1 .- avec), #* prod(ptries),
+            num = prod(1 .- avec) * prod(ptries),
             divergent,
     )
 end
