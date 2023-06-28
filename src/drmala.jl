@@ -78,16 +78,11 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
     steps = ifelse(isfinite(steps), steps, 1)
     steps = round(Int64, clamp(steps, 1, 1000))
     metric = sampler.metric[:, 1]
-    metric ./= maximum(metric)
+    # metric ./= maximum(metric)
     noise = sampler.noise[1]
     # TODO deal with J and reduction_factor
     J = get(kwargs, :J, 3)
     reduction_factor = get(kwargs, :reduction_factor, 4)
-    warmup = get(kwargs, :warmup, div(size(draws, 1), 2))
-    # if m < warmup
-    #     J = 1
-    #     noise = 0
-    # end
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             @views info = drhmc!(
@@ -99,14 +94,14 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.dims,
                 metric,
                 stepsize,
-                steps,
+                31, # steps,
                 noise,
                 J,
                 reduction_factor,
                 1000;
                 kwargs...,
             )
-            info = (; info..., damping=sampler.damping[1])
+            info = (; info..., trajectorylength, damping=sampler.damping[1])
             record!(sampler, trace, info, m + 1, chain)
         end
     end

@@ -39,7 +39,7 @@ function drhmc!(
         pj .= p
 
         a = reduction_factor ^ j
-        ld, gradient = leapfrog!(qj, pj, ldg, gradient, ss ./ a, steps * a; kwargs...)
+        ld, gradient = leapfrog!(qj, pj, ldg, gradient, ss ./ a, steps * a * (j+1); kwargs...)
 
         Hj = hamiltonian(ld, pj)
         isnan(Hj) && (Hj = typemax(T))
@@ -112,7 +112,7 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
         pj .= momentum
 
         a = reduction_factor ^ j
-        ld, gradient = leapfrog!(qj, pj, ldg, gradient, stepsize / a, steps * a; kwargs...)
+        ld, gradient = leapfrog!(qj, pj, ldg, gradient, stepsize / a, steps * a * (j+1); kwargs...) # * (j+1)
 
         Hj = hamiltonian(ld, pj)
         divergent = Hj - H > maxdeltaH
