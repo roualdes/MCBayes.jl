@@ -6,6 +6,10 @@ function set!(sampler, ma::AbstractMetricAdapter, args...; kwargs...)
     sampler.metric .= ma.metric
 end
 
+function metric_mean(ma::AbstractMetricAdapter, args...; kwargs...)
+    return ma.om.m
+end
+
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     metric::Matrix{T}
@@ -48,6 +52,12 @@ end
 
 function MetricConstant(initial_metric::AbstractMatrix, args...; kwargs...)
     return MetricConstant(initial_metric)
+end
+
+function metric_mean(mc::MetricConstant, args...; kwargs...)
+    T = eltype(mc.metric)
+    dims = size(mc.metric, 1)
+    return zeros(T, dims)
 end
 
 function update!(mc::MetricConstant, args...; kwargs...) end

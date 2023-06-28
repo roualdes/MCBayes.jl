@@ -246,7 +246,6 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
             previousmomentum=zeros(T, dims, chains),
             momentum=zeros(T, dims, chains),
             position=zeros(T, dims, chains),
-            retries=zeros(Int, sampler.K, chains),
     )
 end
 
@@ -270,5 +269,4 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
     trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
-    trace[:retries][info[:retries], chain] += 1
 end

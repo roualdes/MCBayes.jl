@@ -186,9 +186,7 @@ function adapt!(
             metric = sqrt.(sampler.metric[:, 1])
             metric ./= maximum(metric)
 
-            # TODO need something better/different than metric_adapter.om.m,
-            # MetricConstant doesn't have a .om.m
-            update!(pca_adapter, (positions .- metric_adapter.om.m) ./ metric; kwargs...)
+            update!(pca_adapter, (positions .- metric_mean(metric_adapter)) ./ metric; kwargs...)
             set!(sampler, pca_adapter; kwargs...)
         end
 

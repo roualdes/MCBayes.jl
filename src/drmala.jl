@@ -1,3 +1,4 @@
+# adapted from https://github.com/modichirag/hmc/blob/main/src/algorithms.py#L463
 abstract type AbstractDrMALA{T} <: AbstractSampler{T} end
 
 struct DrMALA{T} <: AbstractDrMALA{T}
@@ -55,7 +56,6 @@ function sample!(
         stepsize_adapter,
         metric_adapter,
         pca_adapter,
-        trajectorylength_adapter,
         damping_adapter,
         noise_adapter,
         adaptation_schedule,
@@ -68,51 +68,33 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
     chains = size(draws, 3)
     stepsize = sampler.stepsize[1]
     metric = sampler.metric[:, 1]
-    metric ./= maximum(metric)
     noise = sampler.noise[1]
+    # TODO deal with J and reduction_factor
+    J = get(kwargs, :J, 3)
+    reduction_factor = get(kwargs, :reduction_factor, 4)
     warmup = get(kwargs, :warmup, div(size(draws, 1), 2))
-    T = eltype(position)
+    # if m < warmup
+    #     J = 1
+    #     noise = 0
+    # end
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
-
-            q = draws[m, :, chain]
-            p = noise .* sampler.momentum[:, chain] .+ sqrt.(1 .- noise .^ 2) .* randn(T, dims)
-
-            ld, gradient = ldg(q; kwargs...)
-            H0 = hamiltonian(ld, p)
-            isnan(H0) && (H0 = typemax(T))
-
-            ld, gradient = leapfrog!(q, p, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...)
-
-            H = hamiltonian(ld, p)
-            isnan(H) && (H = typemax(T))
-            divergent = H - H0 > maxdeltaH
-
-            a = min(1, exp(H0 - H))
-            accepted = rand(rng, T) <= a
-
-            if accepted
-                position_next .= q
-                momentum .= p
-            else
-                position_next .= position
-                momentum .*= -1
-            end
-
-            # @views info = drhmc!(
-            #     draws[m, :, chain],
-            #     draws[m + 1, :, chain],
-            #     sampler.momentum[:, chain],
-            #     ldg,
-            #     rngs[chain],
-            #     sampler.dims,
-            #     metric,
-            #     stepsize,
-            #     1,
-            #     noise,
-            #     1000;
-            #     kwargs...,
-            # )
+            @views info = drhmc!(
+                draws[m, :, chain],
+                draws[m + 1, :, chain],
+                sampler.momentum[:, chain],
+                ldg,
+                rngs[chain],
+                sampler.dims,
+                metric,
+                stepsize,
+                1,
+                noise,
+                J,
+                reduction_factor,
+                1000;
+                kwargs...,
+            )
             info = (; info..., damping=sampler.damping[1])
             record!(sampler, trace, info, m + 1, chain)
         end
