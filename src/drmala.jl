@@ -94,7 +94,7 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.dims,
                 metric,
                 stepsize,
-                31, # steps,
+                1, # steps,
                 noise,
                 J,
                 reduction_factor,
