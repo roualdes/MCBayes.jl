@@ -25,12 +25,14 @@ function DrMALA(
     pca=zeros(T, dims),
     stepsize=ones(T, 1),
     trajectorylength=ones(T, 1),
-    )
+)
     momentum = randn(T, dims, chains)
     D = convert(Int, dims)::Int
     damping = ones(T, 1)
     noise = ones(T, 1)
-    return DrMALA(momentum, metric, pca, trajectorylength, stepsize, damping, noise, D, chains)
+    return DrMALA(
+        momentum, metric, pca, trajectorylength, stepsize, damping, noise, D, chains
+    )
 end
 
 function sample!(

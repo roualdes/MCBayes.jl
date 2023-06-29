@@ -32,16 +32,12 @@ function langevin_trajectory!(
     return Δ, ld
 end
 
-
 # adapted from
 # https://arxiv.org/pdf/hep-lat/0505020.pdf eq. 20
 # https://github.com/JaimeRZP/MicroCanonicalHMC.jl/blob/master/src/integrators.jl
 const lambda = 0.1931833275037836
 
-function minimal_norm!(
-    position, momentum, ldg, gradient, stepsize, steps; kwargs...
-)
-
+function minimal_norm!(position, momentum, ldg, gradient, stepsize, steps; kwargs...)
     ld = zero(eltype(position))
 
     for step in 1:steps

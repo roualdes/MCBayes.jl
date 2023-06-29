@@ -27,12 +27,14 @@ function XHMC(
     stepsize=ones(T, 1),
     trajectorylength=ones(T, 1),
     K=3,
-    )
+)
     momentum = randn(T, dims, chains)
     D = convert(Int, dims)::Int
     damping = ones(T, 1)
     noise = ones(T, 1)
-    return XHMC(momentum, metric, pca, stepsize, trajectorylength, damping, noise, K, D, chains)
+    return XHMC(
+        momentum, metric, pca, stepsize, trajectorylength, damping, noise, K, D, chains
+    )
 end
 
 function sample!(

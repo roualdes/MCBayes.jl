@@ -13,7 +13,7 @@ function drhmc!(
     reduction_factor,
     maxdeltaH;
     kwargs...,
-    )
+)
     T = eltype(position)
     q = copy(position)
     p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(rng, T, dims)
@@ -33,12 +33,12 @@ function drhmc!(
     pj = similar(p)
     jf = 0
 
-    for j in 0:J-1
+    for j in 0:(J - 1)
         qj .= q
         ld, gradient = ldg(qj; kwargs...)
         pj .= p
 
-        a = reduction_factor ^ j
+        a = reduction_factor^j
         ld, gradient = leapfrog!(qj, pj, ldg, gradient, ss ./ a, steps; kwargs...)
 
         Hj = hamiltonian(ld, pj)
@@ -52,7 +52,9 @@ function drhmc!(
 
         jdx = 1:j
         den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
-        (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, ss, reduction_factor, maxdeltaH; kwargs...)
+        (num, divergent) = get_num(
+            j, qj, -pj, Hj, gradient, ldg, steps, ss, reduction_factor, maxdeltaH; kwargs...
+        )
 
         prob = pfac * num / den
         if isnan(prob) || isinf(prob)
@@ -83,21 +85,32 @@ function drhmc!(
     end
 
     return (;
-            accepted,
-            divergent,
-            stepsize,
-            steps,
-            noise,
-            ld,
-            acceptstat = avec[jf + 1],
-            energy=hamiltonian(ld, position_next),
-            momentum=pj,
-            position=qj,
-            )
-
+        accepted,
+        divergent,
+        stepsize,
+        steps,
+        noise,
+        ld,
+        acceptstat=avec[jf + 1],
+        energy=hamiltonian(ld, position_next),
+        momentum=pj,
+        position=qj,
+    )
 end
 
-function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH; kwargs...)
+function get_num(
+    J,
+    position,
+    momentum,
+    H,
+    gradient,
+    ldg,
+    steps,
+    stepsize,
+    reduction_factor,
+    maxdeltaH;
+    kwargs...,
+)
     T = eltype(position)
     avec = zeros(T, J)
     ptries = ones(T, J)
@@ -106,12 +119,12 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
     qj = similar(position)
     pj = similar(momentum)
 
-    for j in 0:J-1
+    for j in 0:(J - 1)
         qj .= position
         ld, gradient = ldg(qj; kwargs...)
         pj .= momentum
 
-        a = reduction_factor ^ j
+        a = reduction_factor^j
         ld, gradient = leapfrog!(qj, pj, ldg, gradient, stepsize / a, steps; kwargs...)
 
         Hj = hamiltonian(ld, pj)
@@ -126,17 +139,16 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
         if j > 0
             jdx = 1:j
             den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
-            (num, divergent) = get_num(j, qj, -pj, Hj, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH)
+            (num, divergent) = get_num(
+                j, qj, -pj, Hj, gradient, ldg, steps, stepsize, reduction_factor, maxdeltaH
+            )
             prob = pfac * num / den
         else
             prob = pfac
         end
 
         if isinf(prob) || isnan(prob)
-            return (;
-                    num = zero(T),
-                    divergent,
-                    )
+            return (; num=zero(T), divergent)
         else
             avec[j + 1] = min(1, prob)
         end
@@ -149,19 +161,12 @@ function get_num(J, position, momentum, H, gradient, ldg, steps, stepsize, reduc
 
         pa = prod(1 .- avec)
         if iszero(pa)
-            return (;
-                    num = zero(T),
-                    divergent,
-                    )
+            return (; num=zero(T), divergent)
         end
     end
 
-    return (;
-            num = prod(1 .- avec) * prod(ptries),
-            divergent,
-    )
+    return (; num=prod(1 .- avec) * prod(ptries), divergent)
 end
-
 
 function xhmc!(
     position,
@@ -195,8 +200,9 @@ function xhmc!(
 
     while u > a && k < K
         k += 1
-        ld, gradient = minimal_norm!(q, p, ldg, gradient, stepsize .* sqrt.(metric), steps;
-                                     kwargs...)
+        ld, gradient = minimal_norm!(
+            q, p, ldg, gradient, stepsize .* sqrt.(metric), steps; kwargs...
+        )
 
         H = hamiltonian(ld, p)
         isnan(H) && (H = typemax(T))
@@ -219,17 +225,17 @@ function xhmc!(
     end
 
     return (;
-            accepted,
-            divergent,
-            stepsize,
-            steps,
-            noise,
-            ld,
-            acceptstat,
-            energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
-            momentum=p,
-            position=q,
-            retries=k,
+        accepted,
+        divergent,
+        stepsize,
+        steps,
+        noise,
+        ld,
+        acceptstat,
+        energy=hamiltonian(ld, p), # TODO this should be hamiltonian(ld, position_next)
+        momentum=p,
+        position=q,
+        retries=k,
     )
 end
 
