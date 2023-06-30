@@ -40,7 +40,7 @@ function sample!(
     stepsize_adapter=StepsizeAdam(sampler.stepsize, warmup; δ=0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(eltype(sampler), sampler.dims),
-    trajectorylength_adapter=TrajectorylengthSNAPER(
+    trajectorylength_adapter=TrajectorylengthMALT(
         sampler.trajectorylength, sampler.dims, warmup
     ),
     damping_adapter=DampingMALT(sampler.damping),

@@ -184,7 +184,8 @@ function adapt!(
 
         if :pca in fieldnames(typeof(sampler))
             metric = sqrt.(sampler.metric[:, 1])
-            metric ./= maximum(metric)
+            mn, mx = extrema(metric)
+            metric ./= mx #.*= mn ./ mx #
 
             update!(
                 pca_adapter, (positions .- metric_mean(metric_adapter)) ./ metric; kwargs...
@@ -205,7 +206,7 @@ function adapt!(
         accept_stats .+= 1e-20
 
         if m > stepsize_delay
-            abar = inv(mean(inv, accept_stats))
+            abar = mean(accept_stats) # inv(mean(inv, accept_stats)) #
             update!(stepsize_adapter, abar, m + 1; warmup, kwargs...)
             set!(sampler, stepsize_adapter; kwargs...)
         end
