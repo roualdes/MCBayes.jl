@@ -116,7 +116,7 @@ function trace(sampler::MALT{T}, iterations) where {T}
         divergence=zeros(Bool, iterations, chains),
         energy=zeros(T, iterations, chains),
         stepsize=zeros(T, iterations, chains),
-        steps=zeros(Int, iterations, 1),
+        steps=zeros(Int, iterations),
         damping=zeros(T, iterations, chains),
         noise=zeros(T, iterations, chains),
         trajectorylength=zeros(T, iterations, chains),
@@ -124,6 +124,7 @@ function trace(sampler::MALT{T}, iterations) where {T}
         previousmomentum=zeros(T, dims, chains),
         momentum=zeros(T, dims, chains),
         position=zeros(T, dims, chains),
+        pca=zeros(T, iterations, dims),
     )
 end
 
@@ -148,6 +149,7 @@ function record!(sampler::MALT{T}, trace::NamedTuple, info, iteration, chain) wh
     trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
+    trace[:pca][iteration, :] .= info[:pca]
 end
 
 function trace(sampler::AbstractSGA{T}, iterations) where {T}
@@ -247,6 +249,7 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
         previousmomentum=zeros(T, dims, chains),
         momentum=zeros(T, dims, chains),
         position=zeros(T, dims, chains),
+        pca=zeros(T, iterations, dims),
     )
 end
 
@@ -271,4 +274,5 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
     trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
     trace[:momentum][:, chain] .= info[:momentum]
     trace[:position][:, chain] .= info[:position]
+    trace[:pca][iteration, :] .= info[:pca]
 end

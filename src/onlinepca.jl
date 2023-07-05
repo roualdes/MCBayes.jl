@@ -6,13 +6,13 @@ struct OnlinePCA{T<:AbstractFloat}
 end
 
 function OnlinePCA(T, d, l)
-    return OnlinePCA(l, zeros(Int, 1), randn(T, d))
+    return OnlinePCA(l, zeros(Int,1), randn(T, d))
 end
 
-OnlinePCA(d, l=2.0) = OnlinePCA(Float64, d, l)
+OnlinePCA(d, l = 2.0) = OnlinePCA(Float64, d, l)
 
 """
-Assumes x is centered
+Assumes x is centered and scaled
 """
 function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
     dims, chains = size(x)
@@ -27,9 +27,9 @@ function update!(opca::OnlinePCA, x::AbstractMatrix; kwargs...)
     @views for chain in 1:chains
         n += 1
         u = x[:, chain]
-
-        f = ((n - 1 - l) / n) .* opca.pc
-        s = ((1 + l) / n) .* u .* (u' * opca.pc) ./ norm(opca.pc)
+        w = 1 / n
+        f = (n - 1 - l) .* w .* opca.pc
+        s = (1 + l) .* w .* u .* (u' * opca.pc) ./ norm(opca.pc)
         opca.pc .= f .+ s
     end
 

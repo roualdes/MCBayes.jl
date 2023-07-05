@@ -22,12 +22,13 @@ function DrMALA(
     chains=12,
     T=Float64;
     metric=ones(T, dims, 1),
-    pca=zeros(T, dims),
+    pca=randn(T, dims),
     stepsize=ones(T, 1),
     trajectorylength=ones(T, 1),
 )
     momentum = randn(T, dims, chains)
     D = convert(Int, dims)::Int
+    pca ./= norm(pca)
     damping = ones(T, 1)
     noise = ones(T, 1)
     return DrMALA(
@@ -85,6 +86,7 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
     # TODO deal with J and reduction_factor
     J = get(kwargs, :J, 3)
     reduction_factor = get(kwargs, :reduction_factor, 4)
+    pca = sampler.pca / norm(sampler.pca)
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             @views info = drhmc!(
@@ -103,7 +105,7 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
                 1000;
                 kwargs...,
             )
-            info = (; info..., trajectorylength, damping=sampler.damping[1])
+            info = (; info..., pca, trajectorylength, damping=sampler.damping[1])
             record!(sampler, trace, info, m + 1, chain)
         end
     end
