@@ -21,6 +21,11 @@ function set!(sampler, tla::AbstractTrajectorylengthAdapter, args...; kwargs...)
     end
 end
 
+function reset!(tla::AbstractTrajectorylengthAdapter, stepsize, args...; kwargs...)
+    tla.trajectorylength[1] = stepsize
+    tla.trajectorylength_bar[1] = stepsize
+end
+
 function update!(
     tla::AbstractTrajectorylengthAdapter,
     m,

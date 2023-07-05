@@ -19,6 +19,8 @@ end
 
 PCAOnline(dims; kwargs...) = PCAOnline(Float64, dims; kwargs...)
 
+# TODO not convinced this should be smoothed
+# updating the averaging is smoothing, why would we smooth a mean?
 function update!(
     pca::PCAOnline{T}, x::AbstractMatrix, args...; pca_smooth=true, kwargs...
 ) where {T}

@@ -30,7 +30,7 @@ function DrMALA(
     D = convert(Int, dims)::Int
     pca ./= norm(pca)
     damping = ones(T, 1)
-    noise = ones(T, 1)
+    noise = exp.(-2 .* damping .* stepsize)
     return DrMALA(
         momentum, metric, pca, trajectorylength, stepsize, damping, noise, D, chains
     )
@@ -51,7 +51,7 @@ function sample!(
     ),
     damping_adapter=DampingMALT(sampler.damping),
     noise_adapter=NoiseMALT(sampler.noise),
-    adaptation_schedule=SGAAdaptationSchedule(warmup),
+    adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
 )
     return run_sampler!(
@@ -108,5 +108,108 @@ function transition!(sampler::DrMALA, m, ldg, draws, rngs, trace; kwargs...)
             info = (; info..., pca, trajectorylength, damping=sampler.damping[1])
             record!(sampler, trace, info, m + 1, chain)
         end
+    end
+end
+
+function adapt!(
+    sampler::DrMALA,
+    schedule::WindowedAdaptationSchedule,
+    trace,
+    m,
+    ldg,
+    draws,
+    rngs,
+    metric_adapter,
+    pca_adapter,
+    stepsize_initializer,
+    stepsize_adapter,
+    trajectorylength_adapter,
+    damping_adapter,
+    noise_adapter,
+    drift_adapter;
+    stepsize_delay=0,
+    trajectorylength_delay=100,
+    kwargs...,
+    )
+
+    warmup = schedule.warmup
+    if m <= warmup
+        T = eltype(trace.acceptstat)
+        accept_stats = [isnan(as) ? zero(T) : as for as in trace.acceptstat[m + 1, :]]
+        accept_stats .+= 1e-20
+        abar = mean(accept_stats) # inv(mean(inv, accept_stats)) #
+        update!(stepsize_adapter, abar, m + 1; warmup, kwargs...)
+        set!(sampler, stepsize_adapter; kwargs...)
+
+        metric = sqrt.(sampler.metric[:, 1])
+        mn, mx = extrema(metric)
+        metric ./= mx #.*= mn ./ mx #
+
+        positions = draws[m + 1, :, :]
+
+        update!(
+            pca_adapter, (positions .- metric_mean(metric_adapter)) ./ metric; kwargs...
+                )
+
+        update!(damping_adapter, m + 1, norm(sampler.pca); kwargs...)
+        update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
+
+        if schedule.firstwindow <= m <= schedule.lastwindow
+            @views update!(metric_adapter, positions, ldg; kwargs...)
+
+            if m > trajectorylength_delay
+                update!(
+                    trajectorylength_adapter,
+                    m + 1,
+                    accept_stats,
+                    draws[m, :, :],
+                    trace.previousmomentum,
+                    trace.momentum,
+                    trace.position,
+                    sampler.stepsize[1],
+                    sampler.pca ./ norm(sampler.pca),
+                    ldg;
+                    kwargs...,
+                )
+            else
+                trajectorylength_adapter.trajectorylength[1] = sampler.stepsize[1]
+                set!(sampler, trajectorylength_adapter; kwargs...)
+            end
+        end
+
+        if m == schedule.closewindow
+            @views initialize_stepsize!(
+                stepsize_initializer,
+                stepsize_adapter,
+                sampler,
+                rngs,
+                ldg,
+                draws[m + 1, :, :];
+                kwargs...,
+            )
+            set!(sampler, stepsize_adapter; kwargs...)
+            reset!(stepsize_adapter; kwargs...)
+
+            set!(sampler, metric_adapter; kwargs...)
+            reset!(metric_adapter)
+
+            set!(sampler, pca_adapter; kwargs...)
+
+            set!(sampler, damping_adapter; kwargs...)
+
+            set!(sampler, noise_adapter; kwargs...)
+
+            set!(sampler, trajectorylength_adapter; kwargs...)
+            reset!(trajectorylength_adapter, sampler.stepsize[1])
+
+            calculate_nextwindow!(schedule)
+        end
+    else
+        set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
+        set!(sampler, metric_adapter)
+        set!(sampler, pca_adapter)
+        set!(sampler, damping_adapter)
+        set!(sampler, noise_adapter)
+        set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
