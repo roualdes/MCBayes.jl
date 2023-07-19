@@ -11,7 +11,7 @@ Base.eltype(::OnlineMoments{T}) where {T} = T
 
 # TODO T should come last to be more like Adam
 function OnlineMoments(T, d, c)
-    return OnlineMoments(zeros(Int, c), zeros(T, d, c), zeros(T, d, c))
+    return OnlineMoments(zeros(Int, c), zeros(T, d, c), ones(T, d, c))
 end
 
 """
@@ -55,12 +55,12 @@ function update!(om::OnlineMoments, x::AbstractMatrix; kwargs...)
         m = x[:, chain] .- om.m[:, metric]
         w = 1 / om.n[metric]
         @. om.m[:, metric] += m * w
-        @. om.v[:, metric] += -om.v[:, metric] * w + m^2 * w * (1 - w)
+        @. om.v[:, metric] += -om.v[:, metric] * w + m ^ 2 * w * (1 - w)
     end
 end
 
 function reset!(om::OnlineMoments; kwargs...)
     om.n .= 0
     om.m .= 0
-    om.v .= 0
+    om.v .= 1
 end

@@ -1,17 +1,17 @@
-function leapfrog!(position, momentum, ldg, gradient, stepsize, steps; kwargs...)
+function leapfrog!(position, momentum, ldg!, gradient, stepsize, steps; kwargs...)
     ld = zero(eltype(position))
     @. momentum += 0.5 * stepsize * gradient
 
     for step in 1:steps
         @. position += stepsize * momentum
-        ld, gradient = ldg(position; kwargs...)
+        ld = ldg!(position, gradient; kwargs...)
         if step != steps
             @. momentum += stepsize * gradient
         end
     end
 
     @. momentum += 0.5 * stepsize * gradient
-    return ld, gradient
+    return ld
 end
 
 function langevin_trajectory!(
@@ -25,7 +25,7 @@ function langevin_trajectory!(
     for step in 1:steps
         @. @views momentum = noise * momentum + sqrt(1 - noise^2) * ξ[:, step]
         Δ += 0.5 * (momentum' * momentum)
-        ld, gradient = leapfrog!(position, momentum, ldg, gradient, stepsize, 1; kwargs...)
+        ld = leapfrog!(position, momentum, ldg!, gradient, stepsize, 1; kwargs...)
         Δ -= 0.5 * (momentum' * momentum)
     end
 
@@ -43,11 +43,11 @@ function minimal_norm!(position, momentum, ldg, gradient, stepsize, steps; kwarg
     for step in 1:steps
         @. momentum += lambda * stepsize * gradient
         @. position += 0.5 * stepsize * momentum
-        ld, gradient = ldg(position; kwargs...)
+        ld = ldg!(position, gradient; kwargs...)
         @. momentum += (1 - 2 * lambda) * stepsize * gradient
         @. position += 0.5 * stepsize * momentum
-        ld, gradient = ldg(position; kwargs...)
+        ld = ldg!(position, gradient; kwargs...)
         @. momentum += lambda * stepsize * gradient
     end
-    return ld, gradient
+    return ld
 end

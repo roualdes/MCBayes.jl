@@ -6,7 +6,7 @@ mutable struct WindowedAdaptationSchedule
     const lastwindow::Int
 end
 
-function WindowedAdaptationSchedule(warmup; initbuffer=75, termbuffer=50, windowsize=25)
+function WindowedAdaptationSchedule(warmup; initbuffer=75, termbuffer=100, windowsize=25)
     # TODO probably want some reasonable checks on warmup values
     return WindowedAdaptationSchedule(
         initbuffer + windowsize, windowsize, warmup, initbuffer, warmup - termbuffer
@@ -35,6 +35,7 @@ function adapt!(
     pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
+    steps_adapter,
     trajectorylength_adapter,
     damping_adapter,
     noise_adapter,
@@ -48,31 +49,11 @@ function adapt!(
         set!(sampler, stepsize_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
-            @views update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
+            update!(metric_adapter, draws[m + 1, :, :], ldg; kwargs...)
         end
 
-        # if m > trajectorylength_delay && :trajectorylength in fieldnames(typeof(sampler))
-        #     T = eltype(accept_stats)
-        #     accept_stats .= [isnan(as) ? zero(T) : as for as in accept_stats]
-        #     accept_stats .+= 1e-20
-        #     abar = inv(mean(inv, accept_stats))
-        #     positions = draws[m, :, :]
-
-        #     update!(
-        #         trajectorylength_adapter,
-        #         m,
-        #         accept_stats,
-        #         positions,
-        #         trace.momentum,
-        #         trace.position,
-        #         mean(sampler.stepsize);
-        #         kwargs...,
-        #     )
-        #     set!(sampler, trajectorylength_adapter; kwargs...)
-        # end
-
         if m == schedule.closewindow
-            @views initialize_stepsize!(
+            initialize_stepsize!(
                 stepsize_initializer,
                 stepsize_adapter,
                 sampler,
@@ -85,22 +66,12 @@ function adapt!(
             reset!(stepsize_adapter; kwargs...)
 
             set!(sampler, metric_adapter; kwargs...)
-
-            # update!(damping_adapter, sampler.metric; kwargs...)
-            # set!(sampler, damping_adapter; kwargs...)
-
-            # if :damping in fieldnames(typeof(sampler))
-            #     update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
-            #     set!(sampler, noise_adapter; kwargs...)
-            # end
-
-            reset!(metric_adapter)
+            reset!(metric_adapter; kwargs...)
 
             calculate_nextwindow!(schedule)
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)
-        # set!(sampler, trajectorylength_adapter; smoothed=true, kwargs...)
     end
 end
 
@@ -118,6 +89,7 @@ function adapt!(
     pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
+    steps_adapter,
     trajectorylength_adapter,
     damping_adapter,
     noise_adapter,
@@ -168,6 +140,7 @@ function adapt!(
     pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
+    steps_adapter,
     trajectorylength_adapter,
     damping_adapter,
     noise_adapter,
@@ -194,7 +167,7 @@ function adapt!(
         end
 
         if :damping in fieldnames(typeof(sampler))
-            update!(damping_adapter, m + 1, norm(sampler.pca); kwargs...)
+            update!(damping_adapter, m + 1, sqrt(norm(sampler.pca)); kwargs...)
             set!(sampler, damping_adapter; kwargs...)
 
             update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
@@ -251,6 +224,7 @@ function adapt!(
     metric_adapter,
     stepsize_initializer,
     stepsize_adapter,
+    steps_adapter,
     trajectorylength_adapter,
     damping_adapter,
     noise_adapter,

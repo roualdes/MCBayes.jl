@@ -241,15 +241,17 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
         divergence=zeros(Bool, iterations, chains),
         energy=zeros(T, iterations, chains),
         stepsize=zeros(T, iterations, chains),
-        steps=zeros(Int, iterations, 1),
+        steps=zeros(Int, iterations, chains),
         trajectorylength=zeros(T, iterations, chains),
-        damping=zeros(T, iterations, chains),
-        noise=zeros(T, iterations, chains),
+        damping=zeros(T, iterations, dims, chains),
+        noise=zeros(T, iterations, dims, chains),
         ld=zeros(T, iterations, chains),
         previousmomentum=zeros(T, dims, chains),
         momentum=zeros(T, dims, chains),
         position=zeros(T, dims, chains),
-        pca=zeros(T, iterations, dims),
+            pca=zeros(T, iterations, dims, chains),
+            previousposition=zeros(T, dims, chains),
+            retries=zeros(Int, 3, iterations, chains)
     )
 end
 
@@ -261,18 +263,20 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
         :energy,
         :stepsize,
         :trajectorylength,
-        :noise,
-        :damping,
         :ld,
+        :steps,
     )
     for k in keys
         if haskey(info, k)
             trace[k][iteration, chain] = info[k]
         end
     end
-    trace[:steps][iteration] = info[:steps]
-    trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
-    trace[:momentum][:, chain] .= info[:momentum]
-    trace[:position][:, chain] .= info[:position]
-    trace[:pca][iteration, :] .= info[:pca]
+    # trace[:previousmomentum] .= trace[:momentum]
+    trace[:noise][iteration, :, chain] .= info[:noise]
+    trace[:damping][iteration, :, chain] .= info[:damping]
+    trace[:previousposition][:, chain] .= info[:previousposition]
+    trace[:momentum] .= info[:momentum]
+    trace[:position] .= info[:position]
+    trace[:pca][iteration, :, chain] .= info[:pca]
+    trace[:retries][info[:retries], iteration, chain] += 1
 end

@@ -8,7 +8,7 @@ function initialize_stepsize!(
     stepsize_adapter,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 ) end
@@ -20,7 +20,7 @@ function initialize_stepsize!(
     stepsize_adapter::StepsizeConstant,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 ) end
@@ -30,16 +30,18 @@ function initialize_stepsize!(
     stepsize_adapter,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
-)
-    for chain in 1:size(positions, 2)
+    )
+    _, chains = size(positions)
+    _, metrics = size(sampler.metric)
+    for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
         stepsize_adapter.stepsize[chain] = stan_init_stepsize(
             sampler.stepsize[chain],
-            sampler.metric[:, chain],
+            sampler.metric[:, metric],
             rngs[chain],
-            ldg,
+            ldg!,
             positions[:, chain];
             kwargs...,
         )
@@ -48,17 +50,18 @@ function initialize_stepsize!(
     set!(sampler, stepsize_adapter; kwargs...)
 end
 
-function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
+function stan_init_stepsize(stepsize, metric, rng, ldg!, position; kwargs...)
     T = eltype(position)
     dims = length(position)
     q = copy(position)
     momentum = randn(rng, T, dims)
+    gradient = similar(momentum)
 
-    ld, gradient = ldg(q; kwargs...)
+    ld = ldg!(q, gradient; kwargs...)
     H0 = hamiltonian(ld, momentum)
 
-    ld, gradient = leapfrog!(
-        q, momentum, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...
+    ld = leapfrog!(
+        q, momentum, ldg!, gradient, stepsize .* sqrt.(metric), 1; kwargs...
     )
     H = hamiltonian(ld, momentum)
     isnan(H) && (H = typemax(T))
@@ -70,11 +73,11 @@ function stan_init_stepsize(stepsize, metric, rng, ldg, position; kwargs...)
     while true
         momentum .= randn(rng, T, dims)
         q .= position
-        ld, gradient = ldg(q; kwargs...)
+        ld = ldg!(q, gradient; kwargs...)
         H0 = hamiltonian(ld, momentum)
 
-        ld, gradient = leapfrog!(
-            q, momentum, ldg, gradient, stepsize .* sqrt.(metric), 1; kwargs...
+        ld = leapfrog!(
+            q, momentum, ldg!, gradient, stepsize .* sqrt.(metric), 1; kwargs...
         )
         H = hamiltonian(ld, momentum)
         isnan(H) && (H = typemax(T))
@@ -109,7 +112,7 @@ function initialize_stepsize!(
     stepsize_adapter,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 )
@@ -125,7 +128,7 @@ function initialize_stepsize!(
     stepsize_adapter,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 )
@@ -136,7 +139,7 @@ function initialize_stepsize!(
         q = positions[:, kfold]
         sigma = std(q; dims=2)
 
-        update!(stepsize_adapter, ldg, q, sigma, f; kwargs...)
+        update!(stepsize_adapter, ldg!, q, sigma, f; kwargs...)
     end
     set!(sampler, stepsize_adapter; kwargs...)
 end
@@ -148,7 +151,7 @@ function initialize_stepsize!(
     stepsize_adapter::StepsizeConstant,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 ) end
@@ -158,7 +161,7 @@ function initialize_stepsize!(
     stepsize_adapter,
     sampler,
     rngs,
-    ldg,
+    ldg!,
     positions;
     kwargs...,
 )
@@ -180,7 +183,7 @@ function initialize_stepsize!(
             info = hmc!(
                 positions[:, c],
                 tmp[:, c],
-                ldg,
+                ldg!,
                 rngs[c],
                 sampler.dims,
                 metric[:, m],
@@ -191,9 +194,9 @@ function initialize_stepsize!(
             )
             αs[c] = info.acceptstat
         end
-        harmonic_mean = inv(mean(inv, αs)) # mean(αs) #
+        harmonic_mean = mean(αs) # inv(mean(inv, αs)) #
     end
 
     stepsize_adapter.stepsize .= stepsize
-    set!(sampler, stepsize_adapter; kwargs...)
+    set!(sampler, stepsize_adapter, kwargs...)
 end

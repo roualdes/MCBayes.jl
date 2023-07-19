@@ -2,12 +2,8 @@ abstract type AbstractMetricAdapter{T} end
 
 Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
-function set!(sampler, ma::AbstractMetricAdapter, args...; kwargs...)
-    if ma.om.n[1] > 3
-        sampler.metric .= ma.metric
-    else
-        sampler.metric .= 1
-    end
+function set!(sampler, ma::AbstractMetricAdapter{T}, args...; kwargs...) where {T}
+    sampler.metric .= ma.metric
 end
 
 # TODO just add method to
@@ -80,7 +76,7 @@ function update!(meca::MetricECA, sigma, idx, args...; kwargs...)
     meca.metric[:, idx] .= sigma
 end
 
-function set!(sampler, meca::MetricECA, idx, args...; kwargs...)
+function set!(sampler, meca::MetricECA{T}, idx, args...; kwargs...) where {T}
     sampler.metric[:, idx] .= meca.metric[:, idx]
 end
 
@@ -100,22 +96,28 @@ function MetricFisherDivergence(
 end
 
 function update!(
-    mfd::MetricFisherDivergence,
+    mfd::MetricFisherDivergence{T},
     x::AbstractMatrix,
-    ldg,
+    ldg!,
     args...;
-    metric_smooth=true,
+    metric_regularize=true,
     kwargs...,
-    )
-    grads = similar(x)
-    for c in axes(grads, 2)
-        _, grads[:, c] = ldg(x[:, c]; kwargs...)
+    ) where {T}
+    dims, chains = size(x)
+    grads = [zeros(dims) for chain in 1:chains]
+    for chain in axes(x, 2)
+        ldg!(x[:, chain], grads[chain]; kwargs...)
     end
     update!(mfd.om, x; kwargs...)
-    update!(mfd.og, grads; kwargs...)
-    # TODO potential issues: divide by zero, infinity, nan
-    mfd.metric .= sqrt.(mfd.om.v ./ mfd.og.v)
-    mfd.metric .= clamp.(mfd.metric, 1e-10, 1e10)
+    gradients = reduce(hcat, grads)
+    update!(mfd.og, gradients; kwargs...)
+    V = sqrt.(mfd.om.v ./ (mfd.og.v .+ 1e-10))
+    if metric_regularize
+        w = reshape(convert.(T, mfd.om.n ./ (mfd.om.n .+ 5)), 1, :)
+        mfd.metric .= w .* V .+ (1 .- w) .* convert(T, 1e-3)::T
+    else
+        mfd.metric .= V
+    end
 end
 
 function reset!(mfd::MetricFisherDivergence, args...; kwargs...)
