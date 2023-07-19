@@ -21,6 +21,7 @@ include("pca_adapter.jl")
 include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
+include("steps_adapter.jl")
 
 include("sampler_initializer.jl")
 include("draws_initializer.jl")
@@ -85,6 +86,8 @@ export Stan,
     NoiseECA,
     NoiseMALT,
     NoiseConstant,
+    StepsPCA,
+    StepsConstant,
     sample!,
     # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
@@ -114,9 +117,13 @@ function run_sampler!(
         rand(1:typemax(Int), hasfield(typeof(sampler), :chains) ? sampler.chains : 4)
     ),
     draws_initializer=DrawsInitializer(),
+    draws_reinitializer=DrawsInitializerNoop(),
     stepsize_initializer=StepsizeInitializer(),
     stepsize_adapter=StepsizeConstant(
         hasfield(typeof(sampler), :stepsize) ? sampler.stepsize : ones(1)
+    ),
+    steps_adapter=StepsConstant(
+        hasfield(typeof(sampler), :steps) ? sampler.steps : ones(Int, sampler.chains)
     ),
     trajectorylength_adapter=TrajectorylengthConstant(
         hasfield(typeof(sampler), :trajectorylength) ? sampler.trajectorylength : ones(1)
@@ -163,6 +170,8 @@ function run_sampler!(
         kwargs...,
     )
 
+    initialize_draws!(draws_reinitializer, draws, rngs, ldg, sampler.stepsize[1]; kwargs...)
+
     for m in 1:M
         transition!(sampler, m, ldg, draws, rngs, diagnostics; warmup, kwargs...)
 
@@ -180,6 +189,7 @@ function run_sampler!(
             pca_adapter,
             stepsize_initializer,
             stepsize_adapter,
+            steps_adapter,
             trajectorylength_adapter,
             damping_adapter,
             noise_adapter,
@@ -191,22 +201,23 @@ function run_sampler!(
 end
 
 # precompile
-function ldg(x; kwargs...)
-    -x' * x / 2, -x
+function ldg!(x, gradient; kwargs...)
+    gradient .= -x
+    return -x' * x / 2
 end
 
 stan = Stan(10)
-draws, diagnostics, rngs = sample!(stan, ldg)
+draws, diagnostics, rngs = sample!(stan, ldg!)
 ess_mean(draws)
 rhat_basic(draws)
 
 meads = MEADS(10)
-draws, diagnostics, rngs = sample!(meads, ldg)
+draws, diagnostics, rngs = sample!(meads, ldg!)
 
 mala = MALA(10)
-draws, diagnostics, rngs = sample!(mala, ldg)
+draws, diagnostics, rngs = sample!(mala, ldg!)
 
 chees = ChEES(10)
-draws, diagnostics, rngs = sample!(chees, ldg)
+draws, diagnostics, rngs = sample!(chees, ldg!)
 
 end

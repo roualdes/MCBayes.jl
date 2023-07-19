@@ -21,6 +21,11 @@ function set!(sampler, tla::AbstractTrajectorylengthAdapter, args...; kwargs...)
     end
 end
 
+function reset!(tla::AbstractTrajectorylengthAdapter, stepsize, args...; kwargs...)
+    tla.trajectorylength[1] = stepsize
+    tla.trajectorylength_bar[1] = stepsize
+end
+
 function update!(
     tla::AbstractTrajectorylengthAdapter,
     m,
@@ -31,7 +36,7 @@ function update!(
     qs,
     stepsize,
     r,
-    ldg,
+    ldg!,
     args...;
     γ=-0.6, # TODO replace by aw below, or needs to be renamed
     kwargs...,
@@ -39,7 +44,7 @@ function update!(
     update!(tla.omstates, positions; kwargs...)
     update!(tla.omproposals, qs; kwargs...)
     ghats = trajectorylength_gradient(
-        tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg
+        tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg!
     )
 
     for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
@@ -73,7 +78,7 @@ function trajectorylength_gradient(
     qs,
     stepsize,
     r,
-    ldg,
+    ldg!,
 )
     dims, chains = size(positions)
 
@@ -95,7 +100,7 @@ function trajectorylength_gradient(
     @. meanq = mw * tla.omproposals.m + (1 - mw) * meanq
 
     ghats = sampler_trajectorylength_gradient(
-        tla, m, positions, previousps, ps, qs, stepsize, meanθ, meanq, r, ldg
+        tla, m, positions, previousps, ps, qs, stepsize, meanθ, meanq, r, ldg!
     )
     return ghats
 end
@@ -130,7 +135,7 @@ function TrajectorylengthChEES(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthChEES, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthChEES, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     h = halton(m)
@@ -178,7 +183,7 @@ function TrajectorylengthMALT(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthMALT, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthMALT, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     T = eltype(positions)
@@ -226,10 +231,10 @@ function TrajectorylengthSNAPER(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthSNAPER, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthSNAPER, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
-    h = halton(m)
+    h = 1 # halton(m)
     T = eltype(positions)
     dims, chains = size(positions)
     ghats = zeros(chains)
@@ -277,17 +282,19 @@ function TrajectorylengthLDG(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthLDG, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthLDG, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     h = 1 # halton(m)
     T = eltype(positions)
     dims, chains = size(positions)
     ghats = zeros(chains)
+    gradientq = zeros(dims)
+    gradientpos = zeros(dims)
     @views for chain in 1:chains
         q = qs[:, chain]
-        ldq, gradientq = ldg(q)
-        ldp, gradientpos = ldg(positions[:, chain])
+        ldq = ldg!(q, gradientq)
+        ldp = ldg!(positions[:, chain], gradientpos)
         dsq = ldq^2 - ldp^2
         fd = dsq * dot(gradientq, ps[:, chain])
         fd2 = -dsq * dot(gradientpos, previousps[:, chain])
@@ -296,6 +303,89 @@ function sampler_trajectorylength_gradient(
     end
     return ghats
 end
+
+
+struct TrajectorylengthDualAverageLDG{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    da::DualAverage{T}
+    trajectorylength::Vector{T}
+end
+
+
+function TrajectorylengthDualAverageLDG(
+    stepsize::AbstractVector{T};
+    kwargs...,
+    ) where {T}
+    return TrajectorylengthDualAverageLDG(
+        DualAverage(1, T; kwargs...),
+        copy(stepsize),
+    )
+end
+
+function update!(
+    tla::TrajectorylengthDualAverageLDG,
+    αs,
+    previouspositions,
+    proposedpositions,
+    proposedmomentum,
+    stepsize,
+    ldg!,
+    args...;
+    kwargs...,
+)
+
+    ghats = sampler_trajectorylength_gradient(
+        tla, previouspositions, proposedpositions, proposedmomentum, stepsize, ldg!
+    )
+
+    # acceptance probability weighted mean of chains' gradients => ghat
+    T = eltype(previouspositions)
+    a = zero(T)
+    ghat = zero(T)
+    for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
+        if !isfinite(gi) || ai < 1e-4
+            ai = 1e-20
+        end
+        a += ai
+        ghat += ai * (gi - ghat) / a
+    end
+
+    tla.trajectorylength .= update!(tla.da, ghat; kwargs...)
+    # TODO necessary? prefer to skip: logupdate = clamp(as, -0.35, 0.35)           # [3]#L759
+end
+
+function sampler_trajectorylength_gradient(
+    tla::TrajectorylengthDualAverageLDG, previouspositions, proposedpositions, proposedmomentum, stepsize, ldg!
+    )
+
+    T = eltype(previouspositions)
+    dims, chains = size(previouspositions)
+
+    τ = tla.trajectorylength[1] + mean(stepsize)
+
+    ghats = zeros(chains)
+    gradient_previous = zeros(dims)
+    gradient_proposed = zeros(dims)
+
+    @views for chain in 1:chains
+        # previous = previouspositions[:, chain]
+        # ld_previous = ldg!(previous, gradient_previous)
+
+        # proposed = proposedpositions[:, chain]
+        # ld_proposed = ldg!(proposed, gradient_proposed)
+
+
+
+        d = abs(ld_proposed - ld_previous)
+        dg = d * dot(gradient_proposed, proposedmomentum[:, chain])
+        ghats[chain] = 2 * dg - d ^ 2 / τ
+    end
+    return ghats
+end
+
+function reset!(tla::TrajectorylengthDualAverageLDG, args...; kwargs...)
+    reset!(tla.da; kwargs...)
+end
+
 
 struct TrajectorylengthConstant{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     trajectorylength::Vector{T}

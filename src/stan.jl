@@ -32,19 +32,19 @@ end
 
 function sample!(
     sampler::Stan,
-    ldg;
+    ldg!;
     iterations=1000,
     warmup=iterations,
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerStan(),
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize),
+    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ = 0.8),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
     kwargs...,
 )
     return run_sampler!(
         sampler,
-        ldg;
+        ldg!;
         iterations,
         warmup,
         draws_initializer,
@@ -56,7 +56,7 @@ function sample!(
     )
 end
 
-function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
+function transition!(sampler::Stan, m, ldg!, draws, rngs, trace; kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
     @sync for it in 1:nt
@@ -70,7 +70,7 @@ function transition!(sampler::Stan, m, ldg, draws, rngs, trace; kwargs...)
                 sampler.stepsize[chain],
                 sampler.maxdeltaH,
                 sampler.maxtreedepth,
-                ldg;
+                ldg!;
                 kwargs...,
             )
             record!(sampler, trace, info, m + 1, chain)
@@ -91,12 +91,13 @@ function stan_kernel!(
     stepsize,
     maxdeltaH,
     maxtreedepth,
-    ldg;
+    ldg!;
     kwargs...,
 )
     T = eltype(position)
     z = PSPoint(position, randn(rng, T, dims))
-    ld, gradient = ldg(z.position; kwargs...)
+    gradient = Vector{T}(undef, dims)
+    ld = ldg!(z.position, gradient; kwargs...)
     H0 = hamiltonian(ld, z.momentum)
 
     zf = copy(z)
@@ -146,6 +147,7 @@ function stan_kernel!(
                 depth,
                 z,
                 zpr,
+                gradient,
                 metric,
                 rng,
                 psharpfb,
@@ -157,7 +159,7 @@ function stan_kernel!(
                 1,
                 stepsize,
                 maxdeltaH,
-                ldg,
+                ldg!,
                 nleapfrog,
                 lswsubtree,
                 α;
@@ -174,6 +176,7 @@ function stan_kernel!(
                 depth,
                 z,
                 zpr,
+                gradient,
                 metric,
                 rng,
                 psharpbf,
@@ -185,7 +188,7 @@ function stan_kernel!(
                 -1,
                 stepsize,
                 maxdeltaH,
-                ldg,
+                ldg!,
                 nleapfrog,
                 lswsubtree,
                 α;
@@ -226,7 +229,7 @@ function stan_kernel!(
         !persist && break
     end # end while
 
-    ld, gradient = ldg(zsample.position; kwargs...)
+    ld = ldg!(zsample.position, gradient; kwargs...)
     position_next .= zsample.position
 
     return (;
@@ -244,6 +247,7 @@ function buildtree!(
     depth,
     z,
     zpropose,
+    gradient,
     metric,
     rng,
     psharpbeg,
@@ -255,7 +259,7 @@ function buildtree!(
     direction,
     stepsize,
     maxdeltaH,
-    ldg,
+    ldg!,
     nleapfrog,
     logsumweight,
     α;
@@ -263,11 +267,11 @@ function buildtree!(
 )
     T = eltype(z.position)
     if iszero(depth)
-        ld, gradient = ldg(z.position; kwargs...)
-        ld, gradient = leapfrog!(
+        ld = ldg!(z.position, gradient; kwargs...)
+        ld = leapfrog!(
             z.position,
             z.momentum,
-            ldg,
+            ldg!,
             gradient,
             direction .* stepsize .* sqrt.(metric),
             1;
@@ -305,6 +309,7 @@ function buildtree!(
         depth - 1,
         z,
         zpropose,
+        gradient,
         metric,
         rng,
         psharpbeg,
@@ -316,7 +321,7 @@ function buildtree!(
         direction,
         stepsize,
         maxdeltaH,
-        ldg,
+        ldg!,
         nleapfrog,
         lswinit,
         α;
@@ -338,6 +343,7 @@ function buildtree!(
         depth - 1,
         z,
         zfinalpr,
+        gradient,
         metric,
         rng,
         psharpfinalbeg,
@@ -349,7 +355,7 @@ function buildtree!(
         direction,
         stepsize,
         maxdeltaH,
-        ldg,
+        ldg!,
         nleapfrog,
         lswfinal,
         α;

@@ -64,9 +64,8 @@ function NoiseMALT(initial_noise::AbstractVector; kwargs...)
     return NoiseMALT(initial_noise, initial_noise)
 end
 
-function update!(nmalt::NoiseMALT, damping, stepsize, args...; kwargs...)
-
-    nmalt.noise .= exp.(-0.5 .* stepsize .* damping) .- 1e-2
+function update!(nmalt::NoiseMALT, damping, stepsize, args...; noise_reduction_factor = 1e-2, kwargs...)
+    nmalt.noise .= max.(0, exp.(-0.5 .* stepsize .* damping) .- noise_reduction_factor)
     nmalt.noise_bar .= nmalt.noise
 end
 
@@ -74,6 +73,11 @@ end
 function reset!(nmalt::NoiseMALT, args...; kwargs...)
     nmalt.noise .= 0
     nmalt.noise_bar .= 0
+end
+
+function reset!(nmalt::NoiseMALT, damping, stepsize, args...; noise_reduction_factor = 1e-2, kwargs...)
+    nmalt.noise .= exp.(-2 .* damping .* stepsize) .- noise_reduction_factor
+    nmalt.noise_bar .= nmalt.noise
 end
 
 function set!(sampler, nmalt::NoiseMALT, args...; kwargs...)

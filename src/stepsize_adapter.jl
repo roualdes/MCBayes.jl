@@ -31,8 +31,8 @@ function StepsizeAdam(
         adam,
         initial_stepsize,
         initial_stepsize,
-        convert(T, δ),
-        convert(T, stepsize_smoothing_factor),
+        convert(T, δ)::T,
+        convert(T, stepsize_smoothing_factor)::T,
     )
 end
 
@@ -56,6 +56,7 @@ struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     da::DualAverage{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
+    δ::T
 end
 
 """
@@ -64,21 +65,31 @@ end
 Construct a stepsize adapter using the dual averaging method by [Nesterov 2009](https://link.springer.com/article/10.1007/s10107-007-0149-x), as used in [Stan](https://mc-stan.org/docs/reference-manual/hmc-algorithm-parameters.html#ref-Nesterov:2009).  The length of `initial_stepsize::Vector` must be appropriate for the sampling algorithm for which this stepsize adapter will be used.
 """
 function StepsizeDualAverage(
-    initial_stepsize::AbstractVector{T}; kwargs...
+    initial_stepsize::AbstractVector{T}; δ = 0.6, kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
     da = DualAverage(chains, T; kwargs...)
-    return StepsizeDualAverage(da, initial_stepsize, zero(initial_stepsize))
+    return StepsizeDualAverage(da,
+                               initial_stepsize,
+                               initial_stepsize,
+                               convert(T, δ)::T
+)
 end
 
 function update!(ssa::StepsizeDualAverage, αs, args...; kwargs...)
-    ss, ssbar = update!(ssa.da, αs; kwargs...)
-    ssa.stepsize .= ss
-    ssa.stepsize_bar .= ssbar
+    gradient = similar(αs)
+    for (n, a) in pairs(αs)
+        if a > 1
+            a = 1
+        end
+        gradient[n] = ssa.δ - a
+    end
+    ssa.stepsize .= update!(ssa.da, gradient; kwargs...)
+    ssa.stepsize_bar .= optimum(ssa.da)
 end
 
 function reset!(ssa::StepsizeDualAverage, args...; kwargs...)
-    reset!(ssa.da; initial_stepsize=ssa.stepsize_bar, kwargs...)
+    reset!(ssa.da; μ = 10 .* ssa.stepsize, kwargs...)
 end
 
 struct StepsizeConstant{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
@@ -118,13 +129,14 @@ function StepsizeECA(
     return StepsizeECA(initial_stepsize, initial_stepsize)
 end
 
-function update!(seca::StepsizeECA, ldg, positions, scale, idx, args...; kwargs...)
+function update!(seca::StepsizeECA, ldg!, positions, scale, idx, args...; kwargs...)
     dims, chains = size(positions)
-    gradients = similar(positions)
+    grads = [zeros(dims) for chain in 1:chains]
     for chain in axes(positions, 2)
         q = positions[:, chain]
-        _, gradients[:, chain] = ldg(q; kwargs...)
+        ldg!(q, grads[chain]; kwargs...)
     end
+    gradients = reduce(hcat, grads)
     scaled_gradients = gradients .* scale
     seca.stepsize[idx] = min(1, 0.5 / sqrt(max_eigenvalue(scaled_gradients)))
     seca.stepsize_bar[idx] = seca.stepsize[idx]
@@ -134,4 +146,52 @@ function reset!(seca::StepsizeECA, args...; kwargs...) end
 
 function set!(sampler, seca::StepsizeECA, idx, args...; kwargs...)
     sampler.stepsize[idx] = seca.stepsize[idx]
+end
+
+struct StepsizeGradientPCA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
+    stepsize::Vector{T}
+    stepsize_bar::Vector{T}
+    om::OnlineMoments{T}
+    opca::OnlinePCA{T}
+    alpha::T
+end
+
+function StepsizeGradientPCA(
+    initial_stepsize::AbstractVector{T}, dims; stepsize_smoothing_factor=1 - 3 / 4, l = 2.0, kwargs...
+        ) where {T<:AbstractFloat}
+    om = OnlineMoments(T, dims, 1)
+    opca = OnlinePCA(T, dims, convert(T, l)::T)
+    return StepsizeGradientPCA(initial_stepsize, initial_stepsize, om, opca, stepsize_smoothing_factor)
+end
+
+function update!(ssg::StepsizeGradientPCA, positions, ldg!, scale, args...; stepsize_factor = 0.5, stepsize_smooth=true, kwargs...)
+    dims, chains = size(positions)
+    T = eltype(positions)
+
+    u = Vector{T}(undef, dims)
+    f = Vector{T}(undef, dims)
+    gradient = Vector{T}(undef, dims)
+
+    n = ssg.opca.n[1]
+    l = ssg.opca.l
+    sigma = 1 ./ scale
+
+    @views for chain in 1:chains
+        n += 1
+        ldg!(positions[:, chain], gradient; kwargs...)
+        update!(ssg.om, reshape(gradient, :, 1))
+        update!(ssg.opca, -gradient, ssg.om.m[:, 1], sigma, n, l, u, f)
+    end
+
+    ssg.opca.n[1] = n
+
+    lambda_max = sqrt(norm(ssg.opca.pc))
+    ssg.stepsize .= min(1, stepsize_factor * lambda_max)
+    w = ssg.alpha + (1 - stepsize_smooth) * (1 - ssg.alpha)
+    ssg.stepsize_bar .= w .* ssg.stepsize .+ (1 - w) .* ssg.stepsize_bar
+end
+
+function reset!(ssg::StepsizeGradientPCA, args...; kwargs...)
+    reset!(pca.om; kwargs...)
+    reset!(pca.opca; kwargs...)
 end
