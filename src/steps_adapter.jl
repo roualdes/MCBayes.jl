@@ -17,8 +17,8 @@ function update!(sa::StepsPCA, m, lambda_max, stepsize::AbstractVector, n, args.
         step = lambda_max[l] / stepsize[i]
         step = ifelse(isfinite(step), step, 10)
         step = w * step + (1 - w) * 10
-        step = round(Int, clamp(step, 1, max_steps))
-        step = min(m, step)
+        step = clamp(step, 1, max_steps)
+        step = round(Int, min(m, step))
         sa.steps[i] = step
     end
 end

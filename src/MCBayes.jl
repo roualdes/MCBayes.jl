@@ -22,6 +22,7 @@ include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
 include("steps_adapter.jl")
+include("reductionfactor_adapter.jl")
 
 include("sampler_initializer.jl")
 include("draws_initializer.jl")
@@ -88,6 +89,8 @@ export Stan,
     NoiseConstant,
     StepsPCA,
     StepsConstant,
+    ReductionFactorDualAverage,
+    ReductionFactorConstant,
     sample!,
     # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
@@ -124,6 +127,9 @@ function run_sampler!(
     ),
     steps_adapter=StepsConstant(
         hasfield(typeof(sampler), :steps) ? sampler.steps : ones(Int, sampler.chains)
+    ),
+    reductionfactor_adapter=ReductionFactorConstant(
+      hasfield(typeof(sampler), :reductionfactor) ? sampler.reductionfactor : ones(1)
     ),
     trajectorylength_adapter=TrajectorylengthConstant(
         hasfield(typeof(sampler), :trajectorylength) ? sampler.trajectorylength : ones(1)
@@ -189,6 +195,7 @@ function run_sampler!(
             pca_adapter,
             stepsize_initializer,
             stepsize_adapter,
+            reductionfactor_adapter,
             steps_adapter,
             trajectorylength_adapter,
             damping_adapter,

@@ -78,7 +78,9 @@ function update!(opca::OnlinePCA, x::AbstractMatrix, location::AbstractMatrix, s
     opca.n[1] = n
 end
 
-function reset!(opca::OnlinePCA; kwargs...)
+function reset!(opca::OnlinePCA; reset_pc = false, kwargs...)
     opca.n .= 0
-    # opca.pc .+= randn(length(opca.pc))
+    if reset_pc
+        randn!(opca.pc)
+    end
 end

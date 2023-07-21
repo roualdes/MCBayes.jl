@@ -236,22 +236,23 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
     chains = sampler.chains
     dims = sampler.dims
     return (;
-        acceptstat=zeros(T, iterations, chains),
-        accepted=zeros(Bool, iterations, chains),
-        divergence=zeros(Bool, iterations, chains),
-        energy=zeros(T, iterations, chains),
-        stepsize=zeros(T, iterations, chains),
-        steps=zeros(Int, iterations, chains),
-        trajectorylength=zeros(T, iterations, chains),
-        damping=zeros(T, iterations, dims, chains),
-        noise=zeros(T, iterations, dims, chains),
-        ld=zeros(T, iterations, chains),
-        previousmomentum=zeros(T, dims, chains),
-        momentum=zeros(T, dims, chains),
-        position=zeros(T, dims, chains),
+            acceptstat=zeros(T, iterations, chains),
+            finalacceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            steps=zeros(Int, iterations, chains),
+            damping=zeros(T, iterations, dims, chains),
+            noise=zeros(T, iterations, dims, chains),
+            ld=zeros(T, iterations, chains),
+            # previousmomentum=zeros(T, dims, chains),
+            # momentum=zeros(T, dims, chains),
+            # position=zeros(T, dims, chains),
             pca=zeros(T, iterations, dims, chains),
             previousposition=zeros(T, dims, chains),
-            retries=zeros(Int, 3, iterations, chains)
+            retries=zeros(Int, 3, iterations, chains),
+            reductionfactor=zeros(T, iterations)
     )
 end
 
@@ -259,10 +260,10 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
     keys = (
         :accepted,
         :acceptstat,
+        :finalacceptstat,
         :divergence,
         :energy,
         :stepsize,
-        :trajectorylength,
         :ld,
         :steps,
     )
@@ -271,12 +272,13 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:reductionfactor][iteration] = info[:reductionfactor]
     # trace[:previousmomentum] .= trace[:momentum]
     trace[:noise][iteration, :, chain] .= info[:noise]
     trace[:damping][iteration, :, chain] .= info[:damping]
-    trace[:previousposition][:, chain] .= info[:previousposition]
-    trace[:momentum] .= info[:momentum]
-    trace[:position] .= info[:position]
+    # trace[:previousposition][:, chain] .= info[:previousposition]
+    # trace[:momentum] .= info[:momentum]
+    # trace[:position] .= info[:position]
     trace[:pca][iteration, :, chain] .= info[:pca]
     trace[:retries][info[:retries], iteration, chain] += 1
 end

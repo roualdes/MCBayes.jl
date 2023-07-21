@@ -40,7 +40,7 @@ function drhmc!(
         pj .= p
 
         a = reduction_factor^j
-        ld = leapfrog!(qj, pj, ldg!, gradient, ss ./ a, steps; kwargs...)
+        ld = leapfrog!(qj, pj, ldg!, gradient, ss ./ a, round(Int, steps * sqrt(a)); kwargs...)
 
         Hj = hamiltonian(ld, pj)
         isnan(Hj) && (Hj = typemax(T))
@@ -70,6 +70,7 @@ function drhmc!(
             ptries[j + 1] = 1 - avec[j + 1]
         end
 
+        # TODO non-reversible update
         accepted = rand(rng, T) < avec[j + 1]
         if accepted
             jf = j
@@ -93,10 +94,11 @@ function drhmc!(
         noise,
             ld,
             retries = jf + 1,
-        acceptstat=avec[jf + 1],
+            acceptstat=avec[1],
+            finalacceptstat= jf > 0 ? avec[jf + 1] : -1,
             energy=hamiltonian(ld, position_next),
-        momentum=pj,
-        position=qj,
+        # momentum=pj,
+        # position=qj,
     )
 end
 
@@ -127,7 +129,7 @@ function get_num(
         pj .= momentum
 
         a = reduction_factor^j
-        ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, steps; kwargs...)
+        ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, round(Int, steps * sqrt(a)); kwargs...)
 
         Hj = hamiltonian(ld, pj)
         divergent = Hj - H > maxdeltaH
@@ -167,7 +169,8 @@ function get_num(
         end
     end
 
-    return (; num=prod(1 .- avec) * prod(ptries), divergent)
+    return (; num=prod(1 .- avec) * prod(ptries),
+            divergent)
 end
 
 function xhmc!(
@@ -483,4 +486,21 @@ function centered_dot(x, mx, y, my=zero(y))
         s += (x[n] - mx[n]) * (y[n] - my[n])
     end
     return s
+end
+
+
+function maybe_mean(x)
+    T = eltype(x)
+    m = zero(T)
+    all_negative_ones = true
+    n = 0
+    for i in eachindex(x)
+        if x[i] != -1
+            n += 1
+            m += (x[i] - m) / n
+            all_negative_ones = false
+        end
+    end
+    all_negative_ones && return -1
+    return m
 end

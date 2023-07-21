@@ -7,6 +7,7 @@ struct DrMALA{T} <: AbstractDrMALA{T}
     pca::Matrix{T}
     steps::Vector{Int}
     stepsize::Vector{T}
+    reductionfactor::Vector{T}
     damping::Vector{T}
     noise::Vector{T}
     dims::Int
@@ -24,6 +25,7 @@ function DrMALA(
     metric=ones(T, dims, 1),
     pca=randn(T, dims, 1),
     stepsize=ones(T, chains),
+    reductionfactor=5 * ones(T, 1),
     steps=10 * ones(Int, chains),
 )
     momentum = randn(T, dims, chains)
@@ -32,7 +34,7 @@ function DrMALA(
     damping = ones(T, 1)
     noise = exp.(-2 .* damping .* stepsize)
     return DrMALA(
-        momentum, metric, pca, steps, stepsize, damping, noise, D, chains
+        momentum, metric, pca, steps, stepsize, reductionfactor, damping, noise, D, chains
     )
 end
 
@@ -44,7 +46,8 @@ function sample!(
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerStan(),
     steps_adapter=StepsPCA(sampler.steps),
-    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.8),
+    stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.5),
+    reductionfactor_adapter=ReductionFactorDualAverage(sampler.reductionfactor; reductionfactor_δ = 0.9),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(sampler.pca),
     damping_adapter=DampingMALT(sampler.damping),
@@ -60,6 +63,7 @@ function sample!(
         draws_initializer,
         stepsize_initializer,
         stepsize_adapter,
+        reductionfactor_adapter,
         steps_adapter,
         metric_adapter,
         pca_adapter,
@@ -71,11 +75,11 @@ function sample!(
 end
 
 function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
-                     J = 3, reduction_factor = 5, kwargs...)
+                     J = 3, kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
     pca = sampler.pca ./ mapslices(norm, sampler.pca, dims = 1)
-    idx = argmin(sampler.stepsize)
+    reduction_factor = sampler.reductionfactor[1]
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             stepsize = sampler.stepsize[chain]
@@ -87,6 +91,7 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
 
             local info
             acceptstats = zeros(steps)
+            finalacceptstats = zeros(steps)
             retried = zeros(Int, steps)
             lastposition = draws[m, :, chain]
             for step in 1:steps
@@ -108,13 +113,16 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
                 )
                 lastposition .= draws[m + 1, :, chain]
                 acceptstats[step] = info[:acceptstat]
+                finalacceptstats[step] = info[:finalacceptstat]
                 retried[step] = info[:retries]
             end
             info = (; info...,
                     damping,
+                    reductionfactor = reduction_factor,
                     pca = pca[:, 1],
-                    previousposition = draws[m, :, chain],
+                    # previousposition = draws[m, :, chain],
                     acceptstat = mean(acceptstats),
+                    finalacceptstat = maybe_mean(finalacceptstats),
                     steps = sum(retried))
             record!(sampler, trace, info, m + 1, chain)
         end
@@ -133,6 +141,7 @@ function adapt!(
     pca_adapter,
     stepsize_initializer,
     stepsize_adapter,
+    reductionfactor_adapter,
     steps_adapter,
     trajectorylength_adapter,
     damping_adapter,
@@ -144,13 +153,16 @@ function adapt!(
     warmup = schedule.warmup
     if m <= warmup
         accept_stats = trace.acceptstat[m + 1, :]
-        update!(stepsize_adapter, accept_stats, m + 1; warmup, kwargs...)
+        update!(stepsize_adapter, accept_stats; kwargs...)
         set!(sampler, stepsize_adapter; kwargs...)
 
         update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
         set!(sampler, noise_adapter; kwargs...)
 
         if schedule.firstwindow <= m <= schedule.lastwindow
+            final_accept_stats = trace.finalacceptstat[m + 1, :]
+            update!(reductionfactor_adapter, maybe_mean(final_accept_stats); kwargs...)
+
             positions = draws[m + 1, :, :]
 
             update!(metric_adapter, positions, ldg!; kwargs...)
@@ -163,7 +175,7 @@ function adapt!(
                     )
 
             lambda = sqrt.(lambda_max(pca_adapter))
-            update!(steps_adapter, m + 1, 0.5 * lambda, sampler.stepsize, pca_adapter.opca.n[1]; kwargs...)
+            update!(steps_adapter, m + 1, lambda, sampler.stepsize, pca_adapter.opca.n[1]; kwargs...)
 
             update!(damping_adapter, m + 1, lambda, sampler.stepsize; kwargs...)
         end
@@ -181,13 +193,17 @@ function adapt!(
             set!(sampler, stepsize_adapter; kwargs...)
             reset!(stepsize_adapter; kwargs...)
 
+            set!(sampler, reductionfactor_adapter; kwargs...)
+            reset!(reductionfactor_adapter; kwargs...)
+
             set!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
 
             set!(sampler, pca_adapter; kwargs...)
-            reset!(pca_adapter)
+            reset!(pca_adapter; reset_pc = true)
 
             set!(sampler, steps_adapter; kwargs...)
+
             set!(sampler, damping_adapter; kwargs...)
 
             calculate_nextwindow!(schedule)
@@ -199,5 +215,6 @@ function adapt!(
         set!(sampler, damping_adapter)
         set!(sampler, noise_adapter)
         set!(sampler, steps_adapter)
+        set!(sampler, reductionfactor_adapter; smoothed=true, kwargs...)
     end
 end
