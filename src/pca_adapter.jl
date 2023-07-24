@@ -23,7 +23,7 @@ end
 function PCAOnline(initial_pca::AbstractMatrix{T}; l = 2, kwargs...) where {T}
     dims, pcas = size(initial_pca)
     opca = OnlinePCA(T, dims, pcas, convert(T, l)::T)
-    return PCAOnline(opca, initial_pca)
+    return PCAOnline(opca, copy(initial_pca))
 end
 
 PCAOnline(dims; kwargs...) = PCAOnline(Float64, dims; kwargs...)
@@ -53,7 +53,7 @@ struct PCAConstant{T<:AbstractFloat} <: AbstractPCAAdapter{T}
 end
 
 function PCAConstant(initial_pca::AbstractMatrix, args...; kwargs...)
-    return PCAConstant(initial_pca)
+    return PCAConstant(copy(initial_pca))
 end
 
 function update!(pca::PCAConstant, args...; kwargs...) end

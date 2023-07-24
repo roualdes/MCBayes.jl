@@ -90,7 +90,7 @@ function stan_init_stepsize(stepsize, metric, rng, ldg!, position; kwargs...)
         elseif direction == -1 && !(ΔH < dh)
             break
         else
-            stepsize = direction == 1 ? 2 * stepsize : stepsize / 2
+            stepsize = direction == 1 ? 2 * stepsize : 0.5 * stepsize
         end
 
         if stepsize > 1e7

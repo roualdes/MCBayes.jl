@@ -23,7 +23,7 @@ function MetricOnlineMoments(
 ) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
-    return MetricOnlineMoments(om, initial_metric)
+    return MetricOnlineMoments(om, copy(initial_metric))
 end
 
 function update!(
@@ -51,7 +51,7 @@ struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
 end
 
 function MetricConstant(initial_metric::AbstractMatrix, args...; kwargs...)
-    return MetricConstant(initial_metric)
+    return MetricConstant(copy(initial_metric))
 end
 
 function metric_mean(mc::MetricConstant, args...; kwargs...)
@@ -69,7 +69,7 @@ struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
 end
 
 function MetricECA(initial_metric::AbstractMatrix, args...; kwargs...)
-    return MetricECA(initial_metric)
+    return MetricECA(copy(initial_metric))
 end
 
 function update!(meca::MetricECA, sigma, idx, args...; kwargs...)
@@ -92,7 +92,7 @@ function MetricFisherDivergence(
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     og = OnlineMoments(T, dims, metrics)
-    return MetricFisherDivergence(om, og, initial_metric)
+    return MetricFisherDivergence(om, og, copy(initial_metric))
 end
 
 function update!(

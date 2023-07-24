@@ -9,8 +9,11 @@ function drhmc!(
     stepsize,
     steps,
     noise,
+    drift,
+    acceptance_probability,
     J,
     reduction_factor,
+    nonreversible_update,
     maxdeltaH;
     kwargs...,
 )
@@ -70,8 +73,7 @@ function drhmc!(
             ptries[j + 1] = 1 - avec[j + 1]
         end
 
-        # TODO non-reversible update
-        accepted = rand(rng, T) < avec[j + 1]
+        accepted = abs(acceptance_probability[]) < avec[j + 1]
         if accepted
             jf = j
             break
@@ -81,9 +83,16 @@ function drhmc!(
     if accepted
         position_next .= qj
         momentum .= pj
+        acceptance_probability[] *= -avec[jf + 1]
     else
         position_next .= position
         momentum .*= -1
+    end
+
+    acceptance_probability[] = if nonreversible_update
+        (acceptance_probability[] + 1 + drift) % 2 - 1
+    else
+        rand(rng, T)
     end
 
     return (;

@@ -62,7 +62,6 @@ function update!(opca::OnlinePCA, x::AbstractMatrix, location::AbstractMatrix, s
 
     T = eltype(x)
     u = Vector{T}(undef, dims)
-    f = Vector{T}(undef, dims)
 
     n = opca.n[1]
     l = opca.l
@@ -70,9 +69,7 @@ function update!(opca::OnlinePCA, x::AbstractMatrix, location::AbstractMatrix, s
         n += 1
         u .= (x[:, chain] .- location[:, metric]) ./ scale[:, metric]
         w = 1 / n
-        f .= (n - 1 - l) .* w .* opca.pc[:, pca]
-        f .+= (1 + l) .* w .* u .* (u' * opca.pc[:, pca]) ./ norm(opca.pc[:, pca])
-        opca.pc[:, pca] .= f
+        opca.pc[:, pca] .= w .* ((n - 1 - l) .* opca.pc[:, pca] .+ (1 + l) .* u .* (u' * opca.pc[:, pca]) ./ norm(opca.pc[:, pca]))
     end
 
     opca.n[1] = n

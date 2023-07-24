@@ -18,7 +18,7 @@ struct NoiseECA{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseECA(initial_noise::AbstractVector{T}; kwargs...) where {T}
-    return NoiseECA(initial_noise, zero(initial_noise))
+    return NoiseECA(copy(initial_noise), copy(initial_noise))
 end
 
 function update!(neca::NoiseECA, damping, args...; kwargs...)
@@ -46,7 +46,7 @@ struct NoiseConstant{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseConstant(initial_noise::AbstractVector; kwargs...)
-    return NoiseConstant(initial_noise, initial_noise)
+    return NoiseConstant(copy(initial_noise), copy(initial_noise))
 end
 
 # function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
@@ -61,7 +61,7 @@ struct NoiseMALT{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseMALT(initial_noise::AbstractVector; kwargs...)
-    return NoiseMALT(initial_noise, initial_noise)
+    return NoiseMALT(copy(initial_noise), copy(initial_noise))
 end
 
 function update!(nmalt::NoiseMALT, damping, stepsize, args...; noise_reduction_factor = 1e-2, kwargs...)

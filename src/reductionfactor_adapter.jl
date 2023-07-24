@@ -19,7 +19,7 @@ end
 
 function ReductionFactorDualAverage(initial_reductionfactor::AbstractVector{T}, args...; reductionfactor_δ = 0.95, kwargs...) where {T}
     da = DualAverage(1, T; μ = -4)
-    return ReductionFactorDualAverage(da, initial_reductionfactor, initial_reductionfactor, fill(convert(T, reductionfactor_δ)::T, 1))
+    return ReductionFactorDualAverage(da, copy(initial_reductionfactor), copy(initial_reductionfactor), fill(convert(T, reductionfactor_δ)::T, 1))
 end
 
 function update!(sa::ReductionFactorDualAverage, α, args...; kwargs...)
@@ -41,7 +41,7 @@ struct ReductionFactorConstant{T<:AbstractFloat} <: AbstractReductionFactorAdapt
 end
 
 function ReductionFactorConstant(initial_reductionfactor::AbstractVector, args...; kwargs...)
-    return ReductionFactorConstant(initial_reductionfactor, initial_reductionfactor)
+    return ReductionFactorConstant(copy(initial_reductionfactor), copy(initial_reductionfactor))
 end
 
 function update!(sc::ReductionFactorConstant, args...; kwargs...)

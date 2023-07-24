@@ -34,7 +34,7 @@ struct DrawsInitializerStan end
 
 function initialize_draws!(initializer::DrawsInitializerStan, draws, rngs, ldg!; kwargs...)
     for chain in axes(draws, 3)
-        @views draws[1, :, chain] = stan_initialize_draw(
+        draws[1, :, chain] .= stan_initialize_draw(
             draws[1, :, chain], ldg!, rngs[chain]; kwargs...
         )
     end
@@ -47,6 +47,7 @@ function stan_initialize_draw(position, ldg!, rng; radius=2, attempts=100, kwarg
     dims = length(position)
     q = copy(position)
     gradient = similar(q)
+    momentum = similar(q)
 
     while a < attempts && !initialized
         q .= radius .* (2 .* rand(rng, T, dims) .- 1)
@@ -57,9 +58,17 @@ function stan_initialize_draw(position, ldg!, rng; radius=2, attempts=100, kwarg
         end
 
         g = sum(gradient)
-        if isfinite(g) && !isnan(g)
-            initialized &= true
+        if !isfinite(g) || isnan(g)
+            initialized = false
+            continue
         end
+
+        # randn!(momentum)
+        # ld = leapfrog!(q, momentum, ldg!, gradient, 1, 1)
+
+        # if !isfinite(ld) || isnan(ld) || any(isnan.(q)) || any(isnan.(momentum))
+        #     initialized = false
+        # end
 
         a += 1
     end

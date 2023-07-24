@@ -246,11 +246,6 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
             damping=zeros(T, iterations, dims, chains),
             noise=zeros(T, iterations, dims, chains),
             ld=zeros(T, iterations, chains),
-            # previousmomentum=zeros(T, dims, chains),
-            # momentum=zeros(T, dims, chains),
-            # position=zeros(T, dims, chains),
-            pca=zeros(T, iterations, dims, chains),
-            previousposition=zeros(T, dims, chains),
             retries=zeros(Int, 3, iterations, chains),
             reductionfactor=zeros(T, iterations)
     )
@@ -273,12 +268,7 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
         end
     end
     trace[:reductionfactor][iteration] = info[:reductionfactor]
-    # trace[:previousmomentum] .= trace[:momentum]
     trace[:noise][iteration, :, chain] .= info[:noise]
     trace[:damping][iteration, :, chain] .= info[:damping]
-    # trace[:previousposition][:, chain] .= info[:previousposition]
-    # trace[:momentum] .= info[:momentum]
-    # trace[:position] .= info[:position]
-    trace[:pca][iteration, :, chain] .= info[:pca]
     trace[:retries][info[:retries], iteration, chain] += 1
 end

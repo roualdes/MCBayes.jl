@@ -10,6 +10,8 @@ struct DrMALA{T} <: AbstractDrMALA{T}
     reductionfactor::Vector{T}
     damping::Vector{T}
     noise::Vector{T}
+    drift::Vector{T}
+    acceptanceprob::Vector{T}
     dims::Int
     chains::Int
 end
@@ -33,8 +35,10 @@ function DrMALA(
     pca ./= mapslices(norm, pca, dims = 1)
     damping = ones(T, 1)
     noise = exp.(-2 .* damping .* stepsize)
+    drift = (1 .- noise .^ 2) ./ 2
+    acceptanceprob = 2 .* rand(T, chains) .- 1
     return DrMALA(
-        momentum, metric, pca, steps, stepsize, reductionfactor, damping, noise, D, chains
+        momentum, metric, pca, steps, stepsize, reductionfactor, damping, noise, drift, acceptanceprob, D, chains
     )
 end
 
@@ -45,7 +49,7 @@ function sample!(
     warmup=iterations,
     draws_initializer=DrawsInitializerStan(),
     stepsize_initializer=StepsizeInitializerStan(),
-    steps_adapter=StepsPCA(sampler.steps),
+    steps_adapter=StepsPCA(copy(sampler.steps)),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.5),
     reductionfactor_adapter=ReductionFactorDualAverage(sampler.reductionfactor; reductionfactor_δ = 0.9),
     metric_adapter=MetricOnlineMoments(sampler.metric),
@@ -75,19 +79,25 @@ function sample!(
 end
 
 function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
-                     J = 3, kwargs...)
+                     J = 3, nonreversible_update = false, malt = true,
+                     kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
-    pca = sampler.pca ./ mapslices(norm, sampler.pca, dims = 1)
     reduction_factor = sampler.reductionfactor[1]
+    if malt
+        randn!(sampler.momentum)
+    end
+    damping = sampler.damping[1]
+    metric = sampler.metric[:, 1]
+    metric ./= maximum(metric)
+
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             stepsize = sampler.stepsize[chain]
             steps = sampler.steps[chain]
-            metric = sampler.metric[:, 1]
-            metric ./= maximum(metric)
             noise = sampler.noise[chain]
-            damping = sampler.damping[1]
+            drift = sampler.drift[chain]
+            acceptanceprob = sampler.acceptanceprob[chain:chain]
 
             local info
             acceptstats = zeros(steps)
@@ -106,8 +116,11 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
                     stepsize,
                     1,
                     noise,
+                    drift,
+                    acceptanceprob,
                     J,
                     reduction_factor,
+                    nonreversible_update,
                     1000;
                     kwargs...,
                 )
@@ -119,8 +132,6 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
             info = (; info...,
                     damping,
                     reductionfactor = reduction_factor,
-                    pca = pca[:, 1],
-                    # previousposition = draws[m, :, chain],
                     acceptstat = mean(acceptstats),
                     finalacceptstat = maybe_mean(finalacceptstats),
                     steps = sum(retried))
@@ -147,6 +158,7 @@ function adapt!(
     damping_adapter,
     noise_adapter,
     drift_adapter;
+    steps_coefficient = 1,
     kwargs...,
     )
 
@@ -158,10 +170,12 @@ function adapt!(
 
         update!(noise_adapter, sampler.damping, sampler.stepsize; kwargs...)
         set!(sampler, noise_adapter; kwargs...)
+        sampler.drift .= (1 .- sampler.noise .^ 2) ./ 2
 
         if schedule.firstwindow <= m <= schedule.lastwindow
             final_accept_stats = trace.finalacceptstat[m + 1, :]
             update!(reductionfactor_adapter, maybe_mean(final_accept_stats); kwargs...)
+            set!(sampler, reductionfactor_adapter; kwargs...)
 
             positions = draws[m + 1, :, :]
 
@@ -175,7 +189,7 @@ function adapt!(
                     )
 
             lambda = sqrt.(lambda_max(pca_adapter))
-            update!(steps_adapter, m + 1, lambda, sampler.stepsize, pca_adapter.opca.n[1]; kwargs...)
+            update!(steps_adapter, m + 1, steps_coefficient * lambda, sampler.stepsize, pca_adapter.opca.n[1]; kwargs...)
 
             update!(damping_adapter, m + 1, lambda, sampler.stepsize; kwargs...)
         end

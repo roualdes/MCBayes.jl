@@ -29,8 +29,8 @@ function StepsizeAdam(
     adam = Adam(chains, warmup, T; kwargs...)
     return StepsizeAdam(
         adam,
-        initial_stepsize,
-        initial_stepsize,
+        copy(initial_stepsize),
+        copy(initial_stepsize),
         convert(T, δ)::T,
         convert(T, stepsize_smoothing_factor)::T,
     )
@@ -49,7 +49,7 @@ function update!(ssa::StepsizeAdam, abar, m, args...; stepsize_smooth=true, kwar
 end
 
 function reset!(ssa::StepsizeAdam, args...; kwargs...)
-    reset!(ssa.adam; initial_stepsize=ssa.stepsize, kwargs...)
+    reset!(ssa.adam; initial_stepsize=copy(ssa.stepsize), kwargs...)
 end
 
 struct StepsizeDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
@@ -70,8 +70,8 @@ function StepsizeDualAverage(
     chains = length(initial_stepsize)
     da = DualAverage(chains, T; kwargs...)
     return StepsizeDualAverage(da,
-                               initial_stepsize,
-                               initial_stepsize,
+                               copy(initial_stepsize),
+                               copy(initial_stepsize),
                                fill(convert(T, δ)::T, 1)
 )
 end
@@ -99,7 +99,7 @@ function StepsizeConstant(
     initial_stepsize::AbstractVector{T}; kwargs...
 ) where {T<:AbstractFloat}
     chains = length(initial_stepsize)
-    return StepsizeConstant(initial_stepsize, initial_stepsize)
+    return StepsizeConstant(copy(initial_stepsize), copy(initial_stepsize))
 end
 
 function update!(ssc::StepsizeConstant, args...; kwargs...) end
@@ -119,7 +119,7 @@ end
 function StepsizeECA(
     initial_stepsize::AbstractVector{T}; kwargs...
 ) where {T<:AbstractFloat}
-    return StepsizeECA(initial_stepsize, initial_stepsize)
+    return StepsizeECA(copy(initial_stepsize), copy(initial_stepsize))
 end
 
 function update!(seca::StepsizeECA, ldg!, positions, scale, idx, args...; kwargs...)
@@ -156,7 +156,7 @@ function StepsizeGradientPCA(
     opca = OnlinePCA(T, dims, 1, convert(T, l)::T)
     om = OnlineMoments(T, dims, 1)
     ssda = StepsizeDualAverage(0.5 * ones(T, 1); δ = 0.8)
-    return StepsizeGradientPCA(initial_stepsize, initial_stepsize, opca, om, ssda, stepsize_smoothing_factor)
+    return StepsizeGradientPCA(copy(initial_stepsize), copy(initial_stepsize), opca, om, ssda, stepsize_smoothing_factor)
 end
 
 function update!(ssg::StepsizeGradientPCA, αs, positions, ldg!, scale, args...; stepsize_factor = 0.5, stepsize_smooth=true, kwargs...)

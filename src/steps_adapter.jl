@@ -15,11 +15,11 @@ function update!(sa::StepsPCA, m, lambda_max, stepsize::AbstractVector, n, args.
     L = Iterators.cycle(1:length(lambda_max))
     for (l, i) in zip(L, 1:length(stepsize))
         step = lambda_max[l] / stepsize[i]
-        step = ifelse(isfinite(step), step, 10)
-        step = w * step + (1 - w) * 10
+        step = ifelse(isfinite(step), step, sa.steps[i])
+        # step = w * step + (1 - w) * 10
         step = clamp(step, 1, max_steps)
-        step = round(Int, min(m, step))
-        sa.steps[i] = step
+        step = min(m, step)
+        sa.steps[i] = round(Int, step)
     end
 end
 
@@ -40,7 +40,7 @@ struct StepsConstant{T<:Integer} <: AbstractStepsAdapter{T}
 end
 
 function StepsConstant(initial_steps::AbstractVector, args...; kwargs...)
-    return StepsConstant(initial_steps)
+    return StepsConstant(copy(initial_steps))
 end
 
 function update!(sc::StepsConstant, args...; kwargs...)
@@ -55,8 +55,8 @@ struct StepsTrajectorylengthDualAverage{T<:AbstractFloat} <: AbstractStepsAdapte
 end
 
 function StepsTrajectorylengthDualAverage(initial_steps::AbstractVector{Int}, stepsize, args...; kwargs...)
-    tla = TrajectorylengthDualAverageLDG(stepsize)
-    return StepsTrajectorylengthDualAverage(initial_steps, tla)
+    tla = TrajectorylengthDualAverageLDG(copy(stepsize))
+    return StepsTrajectorylengthDualAverage(copy(initial_steps), tla)
 end
 
 function update!(sa::StepsTrajectorylengthDualAverage, m, αs, previouspositions, proposedpositions, proposedmomentum, stepsize, ldg!, args...; max_steps = 1000, kwargs...)
