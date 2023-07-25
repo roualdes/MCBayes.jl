@@ -242,7 +242,7 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
             divergence=zeros(Bool, iterations, chains),
             energy=zeros(T, iterations, chains),
             stepsize=zeros(T, iterations, chains),
-            steps=zeros(Int, iterations, chains),
+            leapfrog=zeros(Int, iterations, chains),
             damping=zeros(T, iterations, dims, chains),
             noise=zeros(T, iterations, dims, chains),
             ld=zeros(T, iterations, chains),
@@ -260,7 +260,7 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
         :energy,
         :stepsize,
         :ld,
-        :steps,
+        :leapfrog,
     )
     for k in keys
         if haskey(info, k)

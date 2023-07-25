@@ -104,7 +104,7 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
             local info
             acceptstats = zeros(steps)
             finalacceptstats = zeros(steps)
-            retried = zeros(Int, steps)
+            leapfrog = zeros(Int, steps)
             lastposition = draws[m, :, chain]
             for step in 1:steps
                 @views info = drhmc!(
@@ -129,14 +129,14 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
                 lastposition .= draws[m + 1, :, chain]
                 acceptstats[step] = info[:acceptstat]
                 finalacceptstats[step] = info[:finalacceptstat]
-                retried[step] = info[:retries]
+                leapfrog[step] = info[:leapfrog]
             end
             info = (; info...,
                     damping,
+                    leapfrog = sum(leapfrog),
                     reductionfactor = reduction_factor,
                     acceptstat = mean(acceptstats),
-                    finalacceptstat = maybe_mean(finalacceptstats),
-                    steps = sum(retried))
+                    finalacceptstat = maybe_mean(finalacceptstats))
             record!(sampler, trace, info, m + 1, chain)
         end
     end

@@ -32,6 +32,7 @@ function drhmc!(
 
     accepted = false
     divergent = false
+    leapfrog = 0
 
     qj = similar(q)
     pj = similar(p)
@@ -43,7 +44,9 @@ function drhmc!(
         pj .= p
 
         a = reduction_factor^j
-        ld = leapfrog!(qj, pj, ldg!, gradient, ss ./ a, round(Int, steps * sqrt(a)); kwargs...)
+        numsteps = round(Int, steps * sqrt(a))
+        leapfrog += numsteps
+        ld = leapfrog!(qj, pj, ldg!, gradient, ss ./ a, numsteps; kwargs...)
 
         Hj = hamiltonian(ld, pj)
         isnan(Hj) && (Hj = typemax(T))
@@ -56,9 +59,10 @@ function drhmc!(
 
         jdx = 1:j
         den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
-        (num, divergent) = get_num(
+        (num, divergent, additionalsteps) = get_num(
             j, qj, -pj, Hj, gradient, ldg!, steps, ss, reduction_factor, maxdeltaH; kwargs...
-        )
+                )
+        leapfrog += additionalsteps
 
         prob = pfac * num / den
         if isnan(prob) || isinf(prob)
@@ -99,15 +103,13 @@ function drhmc!(
         accepted,
         divergent,
         stepsize,
-        steps,
-        noise,
+            noise,
             ld,
+            leapfrog,
             retries = jf + 1,
             acceptstat=avec[1],
             finalacceptstat= jf > 0 ? avec[jf + 1] : -1,
             energy=hamiltonian(ld, position_next),
-        # momentum=pj,
-        # position=qj,
     )
 end
 
@@ -128,6 +130,7 @@ function get_num(
     avec = zeros(T, J)
     ptries = ones(T, J)
     divergent = false
+    leapfrog = 0
 
     qj = similar(position)
     pj = similar(momentum)
@@ -138,7 +141,9 @@ function get_num(
         pj .= momentum
 
         a = reduction_factor^j
-        ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, round(Int, steps * sqrt(a)); kwargs...)
+        numsteps = round(Int, steps * sqrt(a))
+        leapfrog += numsteps
+        ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, numsteps; kwargs...)
 
         Hj = hamiltonian(ld, pj)
         divergent = Hj - H > maxdeltaH
@@ -161,7 +166,7 @@ function get_num(
         end
 
         if isinf(prob) || isnan(prob)
-            return (; num=zero(T), divergent)
+            return (; num=zero(T), divergent, leapfrog)
         else
             avec[j + 1] = min(1, prob)
         end
@@ -174,12 +179,12 @@ function get_num(
 
         pa = prod(1 .- avec)
         if iszero(pa)
-            return (; num=zero(T), divergent)
+            return (; num=zero(T), divergent, leapfrog)
         end
     end
 
     return (; num=prod(1 .- avec) * prod(ptries),
-            divergent)
+            divergent, leapfrog)
 end
 
 function xhmc!(
