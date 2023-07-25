@@ -79,14 +79,16 @@ function sample!(
 end
 
 function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
-                     J = 3, nonreversible_update = false, malt = true,
+                     J = 3, nonreversible_update = false, refresh_momenta = true,
                      kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
-    reduction_factor = sampler.reductionfactor[1]
-    if malt
+
+    if refresh_momenta
         randn!(sampler.momentum)
     end
+
+    reduction_factor = sampler.reductionfactor[1]
     damping = sampler.damping[1]
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
