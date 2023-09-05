@@ -139,7 +139,8 @@ function get_num(
     reduction_factor,
     maxdeltaH;
     kwargs...,
-)
+    )
+
     T = eltype(position)
     avec = zeros(T, J)
     ptries = ones(T, J)
@@ -149,54 +150,56 @@ function get_num(
     qj = similar(position)
     pj = similar(momentum)
 
-    for j in 0:(J - 1)
-        qj .= position
-        ld = ldg!(qj, gradient; kwargs...)
-        pj .= momentum
+    if J > 1
+        for j in 0:(J - 1)
+            qj .= position
+            ld = ldg!(qj, gradient; kwargs...)
+            pj .= momentum
 
-        a = ifelse(j == 0, 1, reduction_factor * j)
-        # a = reduction_factor * (j + 1)
-        numsteps = round(Int, steps * a)
-        leapfrog += numsteps
-        ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, numsteps; kwargs...)
+            a = ifelse(j == 0, 1, reduction_factor * j)
+            # a = reduction_factor * (j + 1)
+            numsteps = round(Int, steps * a)
+            leapfrog += numsteps
+            ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, numsteps; kwargs...)
 
-        Hj = hamiltonian(ld, pj)
-        divergent = Hj - H > maxdeltaH
+            Hj = hamiltonian(ld, pj)
+            divergent = Hj - H > maxdeltaH
 
-        pfac = exp(H - Hj)
-        if isapprox(position, qj)
-            pfac = zero(T)
-        end
+            pfac = exp(H - Hj)
+            if isapprox(position, qj)
+                pfac = zero(T)
+            end
 
-        prob = zero(T)
-        additionalsteps = zero(Int)
-        if j > 0
-            jdx = 1:j
-            den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
-            (num, divergent, additionalsteps) = get_num(
-                j, qj, -pj, Hj, gradient, ldg!, steps, stepsize, reduction_factor, maxdeltaH
-            )
-            prob = pfac * num / den
-        else
-            prob = pfac
-        end
-        leapfrog += additionalsteps
+            prob = zero(T)
+            additionalsteps = zero(Int)
+            if j > 0
+                jdx = 1:j
+                den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
+                (num, divergent, additionalsteps) = get_num(
+                    j, qj, -pj, Hj, gradient, ldg!, steps, stepsize, reduction_factor, maxdeltaH
+                )
+                prob = pfac * num / den
+            else
+                prob = pfac
+            end
+            leapfrog += additionalsteps
 
-        if isinf(prob) || isnan(prob)
-            return (; num=zero(T), divergent, leapfrog)
-        else
-            avec[j + 1] = min(1, prob)
-        end
+            if isinf(prob) || isnan(prob)
+                return (; num=zero(T), divergent, leapfrog)
+            else
+                avec[j + 1] = min(1, prob)
+            end
 
-        if isinf(pfac) || isnan(pfac)
-            ptries[j + 1] = one(T)
-        else
-            ptries[j + 1] = 1 - avec[j + 1]
-        end
+            if isinf(pfac) || isnan(pfac)
+                ptries[j + 1] = one(T)
+            else
+                ptries[j + 1] = 1 - avec[j + 1]
+            end
 
-        pa = prod(1 .- avec)
-        if iszero(pa)
-            return (; num=zero(T), divergent, leapfrog)
+            pa = prod(1 .- avec)
+            if iszero(pa)
+                return (; num=zero(T), divergent, leapfrog)
+            end
         end
     end
 

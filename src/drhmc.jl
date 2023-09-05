@@ -24,7 +24,7 @@ function DRHMC(
     metric=ones(T, dims, 1),
     pca=randn(T, dims, 1),
     stepsize=ones(T, 1),
-    reductionfactor=2 * ones(T, 1),
+    reductionfactor=ones(T, 1),
     steps=10 * ones(T, 1),
     )
     momentum = randn(T, dims, chains)
@@ -48,7 +48,7 @@ function sample!(
     stepsize_initializer=StepsizeInitializerStan(),
     steps_adapter = StepsAdamSNAPER(sampler.steps, fill(norm(randn(sampler.dims)), sampler.chains), sampler.dims, warmup, adam_schedule = :linear),
     stepsize_adapter=StepsizeDualAverage(sampler.stepsize; δ=0.8),
-    reductionfactor_adapter=ReductionFactorDualAverage(sampler.reductionfactor, sampler.chains; reductionfactor_δ = 0.95),
+    reductionfactor_adapter=ReductionFactorConstant(sampler.reductionfactor, sampler.chains; reductionfactor_δ = 0.95),
     metric_adapter=MetricOnlineMoments(sampler.metric),
     pca_adapter=PCAOnline(sampler.pca),
     adaptation_schedule=WindowedAdaptationSchedule(warmup),
@@ -89,15 +89,13 @@ function transition!(sampler::DRHMC, m, ldg!, draws, rngs, trace;
     stepsize = sampler.stepsize[1]
     steps = ceil(Int, rand() * sampler.steps[1])
 
-    println("iteration $m")
-    println("steps = $(sampler.steps)")
-    println("stepsize = $(sampler.stepsize)")
-    println("reduction factor = $(sampler.reductionfactor)")
+    # println("iteration $m")
+    # println("steps = $(sampler.steps)")
+    # println("stepsize = $(sampler.stepsize)")
+    # println("reduction factor = $(sampler.reductionfactor)")
 
     @sync for it in 1:nt
         Threads.@spawn for chain in it:nt:chains
-            acceptanceprob = sampler.acceptanceprob[chain:chain]
-
             # @views info = hmc!(
             #     draws[m, :, chain],
             #     draws[m + 1, :, chain],
@@ -110,7 +108,9 @@ function transition!(sampler::DRHMC, m, ldg!, draws, rngs, trace;
             #     1000;
             #     kwargs...,
             # )
-
+            # info = (; info..., momentum = randn(sampler.dims),
+            #         reduction_factor = 1, retries = 1, firsttry = 1,
+            #         finalacceptstat = info.acceptstat)
             @views info = drhmc!(
                 draws[m, :, chain],
                 draws[m + 1, :, chain],
@@ -121,9 +121,9 @@ function transition!(sampler::DRHMC, m, ldg!, draws, rngs, trace;
                 stepsize,
                 steps,
                 1,
-                acceptanceprob,
+                sampler.acceptanceprob[chain:chain],
                 J,
-                reduction_factor,
+                2, # reduction_factor,
                 nru,
                 1000;
                 kwargs...,
@@ -187,8 +187,8 @@ function adapt!(
                     trace.proposedq,
                     trace.previousmomentum,
                     trace.proposedp,
-                    sampler.stepsize[1],
-                    # trace.stepsize[m + 1, :], # effectively stepsize / reduction_factor
+                    # sampler.stepsize[1],
+                    trace.stepsize[m + 1, :], # effectively stepsize / reduction_factor
                     sampler.pca ./ mapslices(norm, sampler.pca, dims = 1),
                     ldg!;
                     kwargs...)
@@ -216,14 +216,7 @@ function adapt!(
             set!(sampler, metric_adapter; kwargs...)
             reset!(metric_adapter)
 
-            # TODO try sqrt(lambda_max)
-            # try do this only once after first, but not following closewindows
-            if schedule.beyondfirstclosewindow
-                reset!(steps_adapter, lambda_max(pca_adapter)[1], sampler.stepsize[1]; kwargs...)
-            else
-                reset!(steps_adapter, mean(sampler.steps), sampler.stepsize[1]; kwargs...)
-                # reset!(steps_adapter, sampler.stepsize[1] * sqrt(maximum(sampler.metric)); kwargs...)
-            end
+            reset!(steps_adapter, lambda_max(pca_adapter)[1], sampler.stepsize[1]; kwargs...)
 
             set!(sampler, pca_adapter; kwargs...)
             reset!(pca_adapter; reset_pc = false)
