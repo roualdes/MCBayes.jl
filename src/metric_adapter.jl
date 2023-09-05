@@ -111,13 +111,15 @@ function update!(
     update!(mfd.om, x; kwargs...)
     gradients = reduce(hcat, grads)
     update!(mfd.og, gradients; kwargs...)
-    V = sqrt.(mfd.om.v ./ (mfd.og.v .+ 1e-10))
-    if metric_regularize
-        w = reshape(convert.(T, mfd.om.n ./ (mfd.om.n .+ 5)), 1, :)
-        mfd.metric .= w .* V .+ (1 .- w) .* convert(T, 1e-3)::T
-    else
-        mfd.metric .= V
+    if mfd.om.n[1] > 2
+        mfd.metric .= sqrt.(mfd.om.v ./ mfd.og.v)
     end
+    # if metric_regularize
+    #     w = reshape(convert.(T, mfd.om.n ./ (mfd.om.n .+ 5)), 1, :)
+    #     mfd.metric .= w .* V .+ (1 .- w) .* convert(T, 1e-3)::T
+    # else
+    #     mfd.metric .= V
+    # end
 end
 
 function reset!(mfd::MetricFisherDivergence, args...; kwargs...)

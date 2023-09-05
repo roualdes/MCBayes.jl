@@ -14,8 +14,8 @@ include("adam.jl")
 include("onlinemoments.jl")
 include("onlinepca.jl")
 
-include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
+include("stepsize_adapter.jl")
 include("metric_adapter.jl")
 include("pca_adapter.jl")
 include("damping_adapter.jl")
@@ -36,6 +36,8 @@ include("malt.jl")
 include("sga.jl")
 include("xhmc.jl")
 include("drmala.jl")
+include("drghmc.jl")
+include("drhmc.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -53,6 +55,8 @@ export Stan,
     SNAPER,
     XHMC,
     DrMALA,
+    DRGHMC,
+    DRHMC,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
@@ -78,6 +82,7 @@ export Stan,
     TrajectorylengthConstant,
     TrajectorylengthChEES,
     TrajectorylengthSNAPER,
+    DualAverageSNAPER,
     TrajectorylengthLDG,
     DampingECA,
     DampingMALT,
@@ -88,6 +93,7 @@ export Stan,
     NoiseMALT,
     NoiseConstant,
     StepsPCA,
+    StepsDualAverageSNAPER,
     StepsConstant,
     ReductionFactorDualAverage,
     ReductionFactorConstant,
@@ -137,7 +143,7 @@ function run_sampler!(
     metric_adapter=MetricConstant(
         hasfield(typeof(sampler), :metric) ? sampler.metric : ones(1)
     ),
-    pca_adapter=PCAConstant(hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1)),
+    pca_adapter=PCAConstant(hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1, 1)),
     damping_adapter=DampingConstant(
         hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)
     ),

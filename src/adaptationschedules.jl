@@ -1,5 +1,7 @@
 mutable struct WindowedAdaptationSchedule
     closewindow::Int
+    beyondfirstclosewindow::Bool
+    previousclosewindow::Int
     windowsize::Int
     const warmup::Int
     const firstwindow::Int
@@ -9,14 +11,16 @@ end
 function WindowedAdaptationSchedule(warmup; initbuffer=75, termbuffer=100, windowsize=25)
     # TODO probably want some reasonable checks on warmup values
     return WindowedAdaptationSchedule(
-        initbuffer + windowsize, windowsize, warmup, initbuffer, warmup - termbuffer
+        initbuffer + windowsize, false, initbuffer, windowsize, warmup, initbuffer, warmup - termbuffer
     )
 end
 
 function calculate_nextwindow!(ws::WindowedAdaptationSchedule)
+    ws.beyondfirstclosewindow = true
     ws.windowsize *= 2
     nextclosewindow = ws.closewindow + ws.windowsize
-    return ws.closewindow = if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
+    ws.previousclosewindow = ws.closewindow
+    ws.closewindow = if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
         ws.lastwindow
     else
         min(nextclosewindow, ws.lastwindow)
@@ -154,6 +158,7 @@ function adapt!(
 )
     warmup = schedule.warmup
     if m <= warmup
+
         positions = draws[m + 1, :, :]
         update!(metric_adapter, positions, ldg; kwargs...)
         set!(sampler, metric_adapter; kwargs...)
@@ -195,8 +200,8 @@ function adapt!(
                     accept_stats,
                     draws[m, :, :],
                     trace.previousmomentum,
-                    trace.momentum,
-                    trace.position,
+                    trace.proposedp,
+                    trace.proposedq,
                     sampler.stepsize[1],
                     sampler.pca ./ norm(sampler.pca),
                     ldg;

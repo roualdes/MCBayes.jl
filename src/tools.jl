@@ -1,14 +1,12 @@
 function drhmc!(
     position,
     position_next,
-    momentum,
     ldg!,
     rng,
     dims,
     metric,
     stepsize,
     steps,
-    noise,
     drift,
     acceptance_probability,
     J,
@@ -19,7 +17,8 @@ function drhmc!(
 )
     T = eltype(position)
     q = copy(position)
-    p = noise .* momentum .+ sqrt.(1 .- noise .^ 2) .* randn(rng, T, dims)
+    p = randn(rng, T, dims)
+    momentum = copy(p)
 
     gradient = similar(q)
     ld = ldg!(q, gradient; kwargs...)
@@ -27,6 +26,7 @@ function drhmc!(
     isnan(H0) && (H0 = typemax(T))
 
     avec = zeros(T, J)
+    prob = zero(T)
     ptries = ones(T, J)
     ss = stepsize .* sqrt.(metric)
 
@@ -36,17 +36,27 @@ function drhmc!(
 
     qj = similar(q)
     pj = similar(p)
-    jf = 0
+    qproposed = similar(q)
+    pproposed = similar(p)
+    jf = -1
+    a = zero(T)
 
-    for j in 0:(J - 1)
+    for j in 0:J-1
+        jf = j
+
         qj .= q
         ld = ldg!(qj, gradient; kwargs...)
         pj .= p
 
-        a = reduction_factor^j
-        numsteps = round(Int, steps * sqrt(a))
+        # TODO
+        a = ifelse(j == 0, 1, reduction_factor * j)
+        # a = reduction_factor * (j + 1)
+        numsteps = round(Int, steps * a)
         leapfrog += numsteps
         ld = leapfrog!(qj, pj, ldg!, gradient, ss ./ a, numsteps; kwargs...)
+
+        qproposed .= qj
+        pproposed .= pj
 
         Hj = hamiltonian(ld, pj)
         isnan(Hj) && (Hj = typemax(T))
@@ -79,7 +89,6 @@ function drhmc!(
 
         accepted = abs(acceptance_probability[]) < avec[j + 1]
         if accepted
-            jf = j
             break
         end
     end
@@ -87,7 +96,7 @@ function drhmc!(
     if accepted
         position_next .= qj
         momentum .= pj
-        acceptance_probability[] *= -avec[jf + 1]
+        acceptance_probability[] *= -prob
     else
         position_next .= position
         momentum .*= -1
@@ -100,15 +109,20 @@ function drhmc!(
     end
 
     return (;
-        accepted,
-        divergent,
-        stepsize,
-            noise,
+            steps,
+            reduction_factor,
+            accepted,
+            divergent,
             ld,
             leapfrog,
+            stepsize = stepsize / a,
+            momentum = momentum,
+            proposedq = qproposed,
+            proposedp = pproposed,
             retries = jf + 1,
-            acceptstat=avec[1],
-            finalacceptstat= jf > 0 ? avec[jf + 1] : -1,
+            firsttry = jf == 0,
+            firstacceptstat = avec[1],
+            finalacceptstat = avec[jf + 1],
             energy=hamiltonian(ld, position_next),
     )
 end
@@ -140,8 +154,9 @@ function get_num(
         ld = ldg!(qj, gradient; kwargs...)
         pj .= momentum
 
-        a = reduction_factor^j
-        numsteps = round(Int, steps * sqrt(a))
+        a = ifelse(j == 0, 1, reduction_factor * j)
+        # a = reduction_factor * (j + 1)
+        numsteps = round(Int, steps * a)
         leapfrog += numsteps
         ld = leapfrog!(qj, pj, ldg!, gradient, stepsize / a, numsteps; kwargs...)
 
@@ -154,16 +169,18 @@ function get_num(
         end
 
         prob = zero(T)
+        additionalsteps = zero(Int)
         if j > 0
             jdx = 1:j
             den = prod(1 .- avec[jdx]) * prod(ptries[jdx])
-            (num, divergent) = get_num(
+            (num, divergent, additionalsteps) = get_num(
                 j, qj, -pj, Hj, gradient, ldg!, steps, stepsize, reduction_factor, maxdeltaH
             )
             prob = pfac * num / den
         else
             prob = pfac
         end
+        leapfrog += additionalsteps
 
         if isinf(prob) || isnan(prob)
             return (; num=zero(T), divergent, leapfrog)
@@ -316,6 +333,7 @@ function hmc!(
     T = eltype(position)
     q = copy(position)
     p = randn(rng, T, dims)
+    momentum = copy(p)
     gradient = similar(q)
 
     ld = ldg!(q, gradient; kwargs...)
@@ -332,6 +350,11 @@ function hmc!(
 
     a = min(1, exp(H0 - H))
     accepted = rand(rng, T) < a
+
+    if any(isnan.(q)) || any(isnan.(p))
+        accepted = false
+    end
+
     if accepted
         position_next .= q
     else
@@ -345,9 +368,53 @@ function hmc!(
         steps,
         ld,
         acceptstat=a,
-        energy=H,
-        momentum=p,
-        position=q,
+            energy=H,
+            previousmomentum=momentum,
+            proposedp=p,
+            proposedq=q,
+    )
+end
+
+function hmc_momentum!(
+    position, position_next, momentum, ldg!, rng, dims, metric, stepsize, steps, maxdeltaH; kwargs...
+)
+    T = eltype(position)
+    q = copy(position)
+    p = copy(momentum)
+    gradient = similar(q)
+
+    ld = ldg!(q, gradient; kwargs...)
+    H0 = hamiltonian(ld, p)
+    isnan(H0) && (H0 = typemax(T))
+
+    ld = leapfrog!(
+        q, p, ldg!, gradient, stepsize .* sqrt.(metric), steps; kwargs...
+    )
+
+    H = hamiltonian(ld, p)
+    isnan(H) && (H = typemax(T))
+    divergent = H - H0 > maxdeltaH
+
+    a = min(1, exp(H0 - H))
+    accepted = rand(rng, T) < a
+
+    if any(isnan.(q)) || any(isnan.(p))
+        accepted = false
+    end
+
+    if accepted
+        position_next .= q
+    else
+        position_next .= position
+    end
+
+    return (;
+            accepted,
+            divergent,
+            acceptstat=a,
+            previousmomentum=momentum,
+            momentum=p,
+            position=q,
     )
 end
 
@@ -503,7 +570,7 @@ function centered_dot(x, mx, y, my=zero(y))
 end
 
 
-function maybe_mean(x)
+function maybe_mean(f, x)
     T = eltype(x)
     m = zero(T)
     all_negative_ones = true
@@ -511,10 +578,32 @@ function maybe_mean(x)
     for i in eachindex(x)
         if x[i] != -1
             n += 1
-            m += (x[i] - m) / n
+            m += (f(x[i]) - m) / n
             all_negative_ones = false
         end
     end
     all_negative_ones && return -1
     return m
+end
+
+function diff(x)
+    return [x[n+1] - x[n] for n in 1:length(x)-1]
+end
+
+function countsignbitchange(x)
+    return sum(diff(signbit.(x)) .!= 0)
+end
+
+function cummean(x)
+    l = length(x)
+    cm = zeros(l)
+    cm[1] = x[1]
+    for n in 2:l
+        cm[n] = cm[n - 1] + (x[n] - cm[n-1]) / n
+    end
+    return cm
+end
+
+function cummean_signchanges(x)
+    return countsignbitchange(diff(cummean(x)))
 end

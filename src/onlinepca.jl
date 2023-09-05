@@ -69,7 +69,7 @@ function update!(opca::OnlinePCA, x::AbstractMatrix, location::AbstractMatrix, s
         n += 1
         u .= (x[:, chain] .- location[:, metric]) ./ scale[:, metric]
         w = 1 / n
-        opca.pc[:, pca] .= w .* ((n - 1 - l) .* opca.pc[:, pca] .+ (1 + l) .* u .* (u' * opca.pc[:, pca]) ./ norm(opca.pc[:, pca]))
+        opca.pc[:, pca] .= w .* ((n - 1 - l) .* opca.pc[:, pca] .+ (1 + l) .* u .* (u' * (opca.pc[:, pca] ./ norm(opca.pc[:, pca]) )))
     end
 
     opca.n[1] = n
@@ -79,5 +79,6 @@ function reset!(opca::OnlinePCA; reset_pc = false, kwargs...)
     opca.n .= 0
     if reset_pc
         randn!(opca.pc)
+        opca.pc ./= mapslices(norm, opca.pc, dims = 1)
     end
 end

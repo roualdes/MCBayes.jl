@@ -161,8 +161,8 @@ function trace(sampler::AbstractSGA{T}, iterations) where {T}
         divergence=zeros(Bool, iterations, chains),
         energy=zeros(T, iterations, chains),
         previousmomentum=zeros(T, dims, chains),
-        momentum=zeros(T, dims, chains),
-        position=zeros(T, dims, chains),
+            proposedp=zeros(T, dims, chains),
+            proposedq=zeros(T, dims, chains),
         stepsize=zeros(T, iterations, 1),
         steps=zeros(Int, iterations, 1),
         trajectorylength=zeros(T, iterations, 1),
@@ -182,9 +182,9 @@ function record!(
     trace[:steps][iteration] = info[:steps]
     trace[:trajectorylength][iteration] = info[:trajectorylength]
     trace[:stepsize][iteration] = info[:stepsize]
-    trace[:previousmomentum][:, chain] .= trace[:momentum][:, chain]
-    trace[:momentum][:, chain] .= info[:momentum]
-    trace[:position][:, chain] .= info[:position]
+    trace[:previousmomentum][:, chain] .= info[:previousmomentum]
+    trace[:proposedp][:, chain] .= info[:proposedp]
+    trace[:proposedq][:, chain] .= info[:proposedq]
 end
 
 function trace(sampler::XHMC{T}, iterations) where {T}
@@ -244,10 +244,13 @@ function trace(sampler::DrMALA{T}, iterations) where {T}
             stepsize=zeros(T, iterations, chains),
             leapfrog=zeros(Int, iterations, chains),
             damping=zeros(T, iterations, dims, chains),
-            noise=zeros(T, iterations, dims, chains),
+            noise=zeros(T, iterations, chains),
             ld=zeros(T, iterations, chains),
             retries=zeros(Int, 3, iterations, chains),
-            reductionfactor=zeros(T, iterations)
+            reductionfactor=zeros(T, iterations),
+            proposedq=zeros(T, dims, chains),
+            proposedp=zeros(T, dims, chains),
+            previousmomentum=zeros(T, dims, chains)
     )
 end
 
@@ -267,8 +270,107 @@ function record!(sampler::DrMALA{T}, trace::NamedTuple, info, iteration, chain) 
             trace[k][iteration, chain] = info[k]
         end
     end
+    trace[:previousmomentum][:, chain] .= info[:previousmomentum]
+    trace[:proposedq][:, chain] .= info[:proposedq]
+    trace[:proposedp][:, chain] .= info[:proposedp]
     trace[:reductionfactor][iteration] = info[:reductionfactor]
-    trace[:noise][iteration, :, chain] .= info[:noise]
+    trace[:noise][iteration, chain] = info[:noise]
     trace[:damping][iteration, :, chain] .= info[:damping]
     trace[:retries][info[:retries], iteration, chain] += 1
+end
+
+function trace(sampler::DRGHMC{T}, iterations) where {T}
+    chains = sampler.chains
+    dims = sampler.dims
+    return (;
+            acceptstat=zeros(T, iterations, chains),
+            finalacceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            leapfrog=zeros(Int, iterations, chains),
+            damping=zeros(T, iterations, dims, chains),
+            noise=zeros(T, iterations, chains),
+            ld=zeros(T, iterations, chains),
+            retries=zeros(Int, 3, iterations, chains),
+            reductionfactor=zeros(T, iterations),
+    )
+end
+
+function record!(sampler::DRGHMC{T}, trace::NamedTuple, info, iteration, chain) where {T}
+    keys = (
+        :accepted,
+        :acceptstat,
+        :finalacceptstat,
+        :divergence,
+        :energy,
+        :stepsize,
+        :ld,
+        :leapfrog,
+    )
+    for k in keys
+        if haskey(info, k)
+            trace[k][iteration, chain] = info[k]
+        end
+    end
+    trace[:reductionfactor][iteration] = info[:reductionfactor]
+    trace[:noise][iteration, chain] = info[:noise]
+    trace[:damping][iteration, :, chain] .= info[:damping]
+    trace[:retries][info[:retries], iteration, chain] += 1
+end
+
+function trace(sampler::DRHMC{T}, iterations) where {T}
+    chains = sampler.chains
+    dims = sampler.dims
+    return (;
+            firstacceptstat=zeros(T, iterations, chains),
+            finalacceptstat=zeros(T, iterations, chains),
+            accepted=zeros(Bool, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            leapfrog=zeros(Int, iterations, chains),
+            steps=zeros(Int, iterations, chains),
+            # damping=zeros(T, iterations, dims, chains),
+            # noise=zeros(T, iterations, chains),
+            ld=zeros(T, iterations, chains),
+            retries=zeros(Int, 3, iterations, chains),
+            reductionfactor=zeros(T, iterations),
+            proposedq=zeros(T, dims, chains),
+            proposedp=zeros(T, dims, chains),
+            previousmomentum=zeros(T, dims, chains),
+            nextmomentum=zeros(T, dims, chains),
+            firsttry=zeros(Int, iterations, chains)
+    )
+end
+
+function record!(sampler::DRHMC{T}, trace::NamedTuple, info, iteration, chain) where {T}
+    keys = (
+        :stepsize,
+        :accepted,
+        :firstacceptstat,
+        :finalacceptstat,
+        :divergence,
+        :energy,
+        :ld,
+        :leapfrog,
+        :steps,
+    )
+
+    for k in keys
+        if haskey(info, k)
+            trace[k][iteration, chain] = info[k]
+        end
+    end
+
+    trace[:previousmomentum][:, chain] .= trace[:nextmomentum][:, chain]
+    trace[:nextmomentum][:, chain] .= info[:momentum]
+    trace[:proposedq][:, chain] .= info[:proposedq]
+    trace[:proposedp][:, chain] .= info[:proposedp]
+    trace[:reductionfactor][iteration] = info[:reduction_factor]
+    # trace[:noise][iteration, chain] = info[:noise]
+    # trace[:damping][iteration, :, chain] .= info[:damping]
+    trace[:retries][info[:retries], iteration, chain] += 1
+    trace[:firsttry][iteration, chain] = info[:firsttry]
 end

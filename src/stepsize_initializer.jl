@@ -34,11 +34,12 @@ function initialize_stepsize!(
     positions;
     kwargs...,
     )
+    stepsizes = length(stepsize_adapter.stepsize)
     _, chains = size(positions)
     _, metrics = size(sampler.metric)
-    for (metric, chain) in zip(Iterators.cycle(1:metrics), 1:chains)
-        stepsize_adapter.stepsize[chain] = stan_init_stepsize(
-            sampler.stepsize[chain],
+    for (metric, s, chain) in zip(Iterators.cycle(1:metrics), Iterators.cycle(stepsizes), 1:chains)
+        stepsize_adapter.stepsize[s] = stan_init_stepsize(
+            sampler.stepsize[s],
             sampler.metric[:, metric],
             rngs[chain],
             ldg!,

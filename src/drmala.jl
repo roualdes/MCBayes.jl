@@ -56,7 +56,7 @@ function sample!(
     pca_adapter=PCAOnline(sampler.pca),
     damping_adapter=DampingMALT(sampler.damping),
     noise_adapter=NoiseMALT(sampler.noise),
-    adaptation_schedule=WindowedAdaptationSchedule(warmup),
+    adaptation_schedule=WindowedAdaptationSchedule(warmup; windowsize = 12),
     kwargs...,
 )
     return run_sampler!(
@@ -79,7 +79,10 @@ function sample!(
 end
 
 function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
-                     J = 3, nonreversible_update = false, refresh_momenta = true,
+                     J = 3,
+                     nonreversible_update = false,
+                     refresh_momenta = false,
+                     persist_momenta = true,
                      kwargs...)
     nt = get(kwargs, :threads, Threads.nthreads())
     chains = size(draws, 3)
@@ -88,17 +91,19 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
         randn!(sampler.momentum)
     end
 
+    nru = m > kwargs[:warmup] && nonreversible_update
+
     reduction_factor = sampler.reductionfactor[1]
     damping = sampler.damping[1]
     metric = sampler.metric[:, 1]
     metric ./= maximum(metric)
+    drift = sampler.drift[1]
 
     Threads.@threads for it in 1:nt
         for chain in it:nt:chains
             stepsize = sampler.stepsize[chain]
             steps = sampler.steps[chain]
             noise = sampler.noise[chain]
-            drift = sampler.drift[chain]
             acceptanceprob = sampler.acceptanceprob[chain:chain]
 
             local info
@@ -122,7 +127,8 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
                     acceptanceprob,
                     J,
                     reduction_factor,
-                    nonreversible_update,
+                    nru,
+                    persist_momenta,
                     1000;
                     kwargs...,
                 )
@@ -140,6 +146,74 @@ function transition!(sampler::DrMALA, m, ldg!, draws, rngs, trace;
             record!(sampler, trace, info, m + 1, chain)
         end
     end
+end
+
+function hmc_mixing!(m, draws, momentum, ldg!, rngs, stepsize_adapter, metric; maxdeltaH = 1000, mixing_windowsize = 20, numsignchanges = 4, max_leapfrogs = 20_000, kwargs...)
+    T = eltype(draws)
+    _, dims, chains = size(draws)
+
+    gradient = zeros(T, dims)
+    lds = zeros(T, mixing_windowsize, chains)
+
+    idx = m-mixing_windowsize:m-1
+    for w in 1:mixing_windowsize
+        for chain in 1:chains
+            lds[w, chain] = ldg!(draws[idx[w], :, chain], gradient; kwargs...)
+        end
+    end
+
+    signchanges = mapslices(cummean_signchanges, lds, dims = 1)
+    if all(signchanges .>= numsignchanges)
+        return
+    end
+
+    @views current_draw = draws[m + 1, :, :]
+    @views next_draw = draws[m + 2, :, :]
+    accept_stats = zeros(T, chains)
+
+    num_leapfrogs = 0
+
+    for l in 1:max_leapfrogs
+        for w in 1:mixing_windowsize-1
+            lds[w, :] .= lds[w+1, :]
+        end
+
+        S = Iterators.cycle(1:length(stepsize_adapter.stepsize))
+        for (chain, s) in zip(1:chains, S)
+            stepsize = stepsize_adapter.stepsize[s]
+
+            @views info = hmc_momentum!(current_draw[:, chain],
+                                        next_draw[:, chain],
+                                        momentum[:, chain],
+                                        ldg!, rngs[chain],
+                                        dims,
+                                        metric,
+                                        stepsize,
+                                        1,
+                                        maxdeltaH;
+                                        kwargs...)
+
+            lds[end, chain] = ldg!(next_draw[:, chain], gradient; kwargs...)
+
+            accept_stats[chain] = info.acceptstat
+            if !info.accepted
+                momentum[:, chain] .= randn(rngs[chain], T, dims)
+            end
+        end
+
+        signchanges = mapslices(cummean_signchanges, lds, dims = 1)
+        if all(signchanges .>= numsignchanges)
+            num_leapfrogs = l
+            break
+        end
+
+        update!(stepsize_adapter, mean(accept_stats), m + l; kwargs...)
+        current_draw .= next_draw
+        num_leapfrogs = l
+    end
+
+    draws[m + 2, :, :] .= next_draw
+    return num_leapfrogs
 end
 
 function adapt!(
@@ -174,6 +248,22 @@ function adapt!(
         set!(sampler, noise_adapter; kwargs...)
         sampler.drift .= (1 .- sampler.noise .^ 2) ./ 2
 
+        if schedule.firstwindow - 1 <= m < schedule.firstwindow
+            hmc_mixing!(m, draws, sampler.momentum, ldg!, rngs, stepsize_adapter;  kwargs...)
+
+            initialize_stepsize!(
+                stepsize_initializer,
+                stepsize_adapter,
+                sampler,
+                rngs,
+                ldg!,
+                draws[m + 1, :, :];
+                kwargs...,
+            )
+            set!(sampler, stepsize_adapter; kwargs...)
+            reset!(stepsize_adapter; kwargs...)
+        end
+
         if schedule.firstwindow <= m <= schedule.lastwindow
             final_accept_stats = trace.finalacceptstat[m + 1, :]
             update!(reductionfactor_adapter, maybe_mean(final_accept_stats); kwargs...)
@@ -183,7 +273,7 @@ function adapt!(
 
             update!(metric_adapter, positions, ldg!; kwargs...)
 
-            metric = sqrt.(sampler.metric)
+            metric = sqrt.(metric_adapter.metric)
             metric ./= maximum(metric, dims = 1)
 
             update!(
@@ -191,12 +281,16 @@ function adapt!(
                     )
 
             lambda = sqrt.(lambda_max(pca_adapter))
-            update!(steps_adapter, m + 1, steps_coefficient * lambda, sampler.stepsize, pca_adapter.opca.n[1]; kwargs...)
+            update!(steps_adapter, m + 1, steps_coefficient * lambda, maximum(sampler.stepsize); kwargs...)
+            set!(sampler, steps_adapter; kwargs...)
 
             update!(damping_adapter, m + 1, lambda, sampler.stepsize; kwargs...)
+            set!(sampler, damping_adapter; kwargs...)
         end
 
         if m == schedule.closewindow
+            calculate_nextwindow!(schedule)
+
             initialize_stepsize!(
                 stepsize_initializer,
                 stepsize_adapter,
@@ -221,8 +315,6 @@ function adapt!(
             set!(sampler, steps_adapter; kwargs...)
 
             set!(sampler, damping_adapter; kwargs...)
-
-            calculate_nextwindow!(schedule)
         end
     else
         set!(sampler, stepsize_adapter; smoothed=true, kwargs...)

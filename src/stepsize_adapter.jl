@@ -145,8 +145,6 @@ struct StepsizeGradientPCA{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
     stepsize::Vector{T}
     stepsize_bar::Vector{T}
     opca::OnlinePCA{T}
-    om::OnlineMoments{T}
-    ssda::StepsizeDualAverage{T}
     alpha::T
 end
 
@@ -154,9 +152,7 @@ function StepsizeGradientPCA(
     initial_stepsize::AbstractVector{T}, dims; stepsize_smoothing_factor=1 - 3 / 4, l = 2.0, kwargs...
         ) where {T<:AbstractFloat}
     opca = OnlinePCA(T, dims, 1, convert(T, l)::T)
-    om = OnlineMoments(T, dims, 1)
-    ssda = StepsizeDualAverage(0.5 * ones(T, 1); δ = 0.8)
-    return StepsizeGradientPCA(copy(initial_stepsize), copy(initial_stepsize), opca, om, ssda, stepsize_smoothing_factor)
+    return StepsizeGradientPCA(copy(initial_stepsize), copy(initial_stepsize), opca, stepsize_smoothing_factor)
 end
 
 function update!(ssg::StepsizeGradientPCA, αs, positions, ldg!, scale, args...; stepsize_factor = 0.5, stepsize_smooth=true, kwargs...)
@@ -164,42 +160,40 @@ function update!(ssg::StepsizeGradientPCA, αs, positions, ldg!, scale, args...;
     T = eltype(positions)
 
     gradients = [zeros(dims) for chain in 1:chains]
-    for chain in 1:chains
+    @views for chain in 1:chains
         q = positions[:, chain]
         ldg!(q, gradients[chain]; kwargs...)
     end
 
     grads = reduce(hcat, gradients)
-    update!(ssg.om, grads)
-    # update!(ssg.ssda, [mean(αs)]; kwargs...)
 
     u = Vector{T}(undef, dims)
     f = Vector{T}(undef, dims)
     g = Vector{T}(undef, dims)
 
-    m = ssg.om.m[:, 1]
-    s = sqrt.(ssg.om.v[:, 1]) ./ scale
+    m = zeros(T, dims)
+    s = ones(T, dims)
 
     n = ssg.opca.n[1]
     l = ssg.opca.l
     for chain in 1:chains
         n += 1
-        g .= grads[:, chain] .+ 1e-10
+        g .= grads[:, chain] .* scale # .+ 1e-10?
         update!(ssg.opca.pc, g, m, s, n, l, u, f)
     end
 
     ssg.opca.n[1] = n
 
-    # println("stepsize factor $(ssg.ssda.stepsize[1])")
-    lambda_max = sqrt(norm(ssg.opca.pc))
+    lambda_max = norm(ssg.opca.pc)
     # println("lambda_max = $(lambda_max)")
     if isnan(lambda_max)
         lambda_max = 1
     end
-    # ss = ssg.ssda.stepsize[1] / (1e-10 + lambda_max)
-    ss = 0.5 / (lambda_max + 1e-10)
-    println("stepsize $(ss)")
-    ssg.stepsize .= min(1, ss)
+
+    ssg.stepsize .= 0.5 / (lambda_max + 1e-10)
+    ssg.stepsize .= minimum.(1, ss)
+    # println("stepsize $(ssg.stepsize)")
+
     w = ssg.alpha + (1 - stepsize_smooth) * (1 - ssg.alpha)
     ssg.stepsize_bar .= w .* ssg.stepsize .+ (1 - w) .* ssg.stepsize_bar
 end
@@ -207,7 +201,70 @@ end
 function reset!(ssg::StepsizeGradientPCA, args...; kwargs...)
     ssg.stepsize .= 1
     ssg.stepsize_bar .= 1
-    reset!(ssg.om; kwargs...)
-    reset!(ssg.ssda; kwargs...)
     reset!(ssg.opca; reset_pc = true, kwargs...)
+end
+
+
+struct StepsizeChEES{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
+    tla::TrajectorylengthChEES{T}
+    stepsize::Vector{T}
+    stepsize_bar::Vector{T}
+    alpha::T
+end
+
+function StepsizeChEES(initial_stepsize::AbstractVector{T}, dims, warmup, args...; stepsize_smoothing_factor=1 - 8 / 9, kwargs...) where {T}
+    tla = TrajectorylengthChEES(copy(initial_stepsize), dims, warmup; kwargs...)
+    alpha = convert(T, stepsize_smoothing_factor)::T
+    return StepsizeChEES(tla, copy(initial_stepsize), copy(initial_stepsize), alpha)
+end
+
+function update!(ss::StepsizeChEES, m, αs, previouspositions, previousmomentum, proposedmomentum, proposedpositions, stepsize, pca, ldg!, args...; max_steps = 1000, stepsize_smooth = true, kwargs...)
+    update!(ss.tla, m, αs, previouspositions, previousmomentum, proposedmomentum, proposedpositions, stepsize, pca, ldg!; kwargs...)
+    τ = optimum(ss.tla, smoothed = false)
+    ss.stepsize .= τ / 1
+    w = ss.alpha + (1 - stepsize_smooth) * (1 - ss.alpha)
+    ss.stepsize_bar .= w .* ss.stepsize .+ (1 - w) .* ss.stepsize_bar
+end
+
+function reset!(ss::StepsizeChEES, stepsize, decay_steps, args...; kwargs...)
+    reset!(ss.tla, stepsize, decay_steps; kwargs...)
+end
+
+
+struct StepsizeFirstTryDualAverage{T<:AbstractFloat} <: AbstractStepsizeAdapter{T}
+    da::DualAverage{T}
+    m::Vector{T}
+    N::Vector{Int}
+    stepsize::Vector{T}
+    stepsize_bar::Vector{T}
+    δ::Vector{T}
+end
+
+function StepsizeFirstTryDualAverage(
+    initial_stepsize::AbstractVector{T}, chains; δ = 0.5, kwargs...
+) where {T<:AbstractFloat}
+    da = DualAverage(1, T; kwargs...)
+    m = zeros(T, chains)
+    N = zeros(Int, 1)
+    return StepsizeFirstTryDualAverage(da,
+                               m,
+                               N,
+                               copy(initial_stepsize),
+                               copy(initial_stepsize),
+                               fill(convert(T, δ)::T, 1)
+)
+end
+
+function update!(ssa::StepsizeFirstTryDualAverage, firsttries, args...; kwargs...)
+    ssa.N[1] += 1
+    @. ssa.m += (firsttries - ssa.m) / ssa.N[1]
+    println("cumulative mean first tries: $(ssa.m)")
+    ssa.stepsize .= update!(ssa.da, ssa.δ .- inv(mean(inv, ssa.m .+ 1e-10)); kwargs...)
+    ssa.stepsize_bar .= optimum(ssa.da)
+end
+
+function reset!(ssa::StepsizeFirstTryDualAverage, args...; kwargs...)
+    ssa.N .= 0
+    ssa.m .= 0
+    reset!(ssa.da; μ = 10 .* ssa.stepsize, kwargs...)
 end
