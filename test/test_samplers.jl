@@ -20,7 +20,7 @@ function prepare_model(model_name)
 end
 
 function prepare_log_density_gradient(bridgestan_model)
-    return function ldg(q)
+    return function ldg(q; kwargs...)
         return try
             BS.log_density_gradient(bridgestan_model, q)
         catch
@@ -30,7 +30,7 @@ function prepare_log_density_gradient(bridgestan_model)
 end
 
 function prepare_log_density(bridgestan_model)
-    return function ld(q)
+    return function ld(q; kwargs...)
         return try
             BS.log_density(bridgestan_model, q)
         catch

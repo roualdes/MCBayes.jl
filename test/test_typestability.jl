@@ -1,8 +1,8 @@
 @testset "Type stability" begin
-    function ld(x)
+    function ld(x; kwargs...)
         return -x' * x / 2
     end
-    function ldg(x)
+    function ldg(x; kwargs...)
         return ld(x), -x
     end
 

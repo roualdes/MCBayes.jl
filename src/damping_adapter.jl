@@ -18,7 +18,7 @@ struct DampingECA{T<:AbstractFloat} <: AbstractDampingAdapter{T}
 end
 
 function DampingECA(initial_damping::AbstractVector{T}; kwargs...) where {T}
-    return DampingECA(initial_damping, zero(initial_damping))
+    return DampingECA(copy(initial_damping), copy(initial_damping))
 end
 
 function update!(deca::DampingECA, m, zpositions, stepsize, idx, args...; kwargs...)
@@ -41,7 +41,7 @@ struct DampingConstant{T<:AbstractFloat} <: AbstractDampingAdapter{T}
 end
 
 function DampingConstant(initial_damping::AbstractVector; kwargs...)
-    return DampingConstant(initial_damping, initial_damping)
+    return DampingConstant(copy(initial_damping), copy(initial_damping))
 end
 
 function update!(dc::DampingConstant, args...; kwargs...) end
@@ -54,11 +54,12 @@ struct DampingMALT{T<:AbstractFloat} <: AbstractDampingAdapter{T}
 end
 
 function DampingMALT(initial_damping::AbstractVector, args...; kwargs...)
-    return DampingMALT(initial_damping, initial_damping)
+    return DampingMALT(copy(initial_damping), copy(initial_damping))
 end
 
-function update!(dmalt::DampingMALT, m, gamma, args...; damping_coefficient=1, kwargs...)
-    dmalt.damping .= damping_coefficient ./ (1e-10 .+ sqrt(gamma))
+function update!(dmalt::DampingMALT, m, gamma, stepsize, args...; damping_coefficient=1, kwargs...)
+    # dmalt.damping .= max.(1 ./ (m .* mean(stepsize)), damping_coefficient ./ (1e-10 .+ gamma))
+    dmalt.damping .= damping_coefficient ./ (1e-10 .+ gamma)
     dmalt.damping_bar .= dmalt.damping
 end
 
@@ -68,6 +69,6 @@ end
 
 # TODO(ear) move reset into AbstractDampingAdapter
 function reset!(dmalt::DampingMALT, args...; kwargs...)
-    dmalt.damping .= 0
-    dmalt.damping_bar .= 0
+    dmalt.damping .= 1
+    dmalt.damping_bar .= 1
 end

@@ -2,23 +2,28 @@ abstract type AbstractMetricAdapter{T} end
 
 Base.eltype(::AbstractMetricAdapter{T}) where {T} = T
 
-function set!(sampler, ma::AbstractMetricAdapter, args...; kwargs...)
+function set!(sampler, ma::AbstractMetricAdapter{T}, args...; kwargs...) where {T}
     sampler.metric .= ma.metric
+end
+
+# TODO just add method to
+# Base.mean or whatever, maybe Statistics.mean
+# via import Statistics.mean
+function metric_mean(ma::AbstractMetricAdapter, args...; kwargs...)
+    return ma.om.m
 end
 
 struct MetricOnlineMoments{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     metric::Matrix{T}
-    alpha::T
 end
 
 function MetricOnlineMoments(
-    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+    initial_metric::AbstractMatrix{T}, args...; kwargs...
 ) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
-    smoothing_factor = convert(T, metric_smoothing_factor)
-    return MetricOnlineMoments(om, initial_metric, smoothing_factor)
+    return MetricOnlineMoments(om, copy(initial_metric))
 end
 
 function update!(
@@ -26,16 +31,15 @@ function update!(
     x::AbstractMatrix,
     args...;
     metric_regularize=true,
-    metric_smooth=true,
     kwargs...,
 ) where {T}
     update!(mom.om, x; kwargs...)
     if metric_regularize
         w = reshape(convert.(T, mom.om.n ./ (mom.om.n .+ 5)), 1, :)
         mom.metric .= w .* mom.om.v .+ (1 .- w) .* convert(T, 1e-3)::T
+    else
+        mom.metric .= mom.om.v
     end
-    w = mom.alpha + (1 - metric_smooth) * (1 - mom.alpha)
-    mom.metric .= w .* mom.om.v .+ (1 - w) .* mom.metric
 end
 
 function reset!(mom::MetricOnlineMoments, args...; kwargs...)
@@ -47,7 +51,13 @@ struct MetricConstant{T<:AbstractFloat} <: AbstractMetricAdapter{T}
 end
 
 function MetricConstant(initial_metric::AbstractMatrix, args...; kwargs...)
-    return MetricConstant(initial_metric)
+    return MetricConstant(copy(initial_metric))
+end
+
+function metric_mean(mc::MetricConstant, args...; kwargs...)
+    T = eltype(mc.metric)
+    dims = size(mc.metric, 1)
+    return zeros(T, dims)
 end
 
 function update!(mc::MetricConstant, args...; kwargs...) end
@@ -59,14 +69,14 @@ struct MetricECA{T<:AbstractFloat} <: AbstractMetricAdapter{T}
 end
 
 function MetricECA(initial_metric::AbstractMatrix, args...; kwargs...)
-    return MetricECA(initial_metric)
+    return MetricECA(copy(initial_metric))
 end
 
 function update!(meca::MetricECA, sigma, idx, args...; kwargs...)
     meca.metric[:, idx] .= sigma
 end
 
-function set!(sampler, meca::MetricECA, idx, args...; kwargs...)
+function set!(sampler, meca::MetricECA{T}, idx, args...; kwargs...) where {T}
     sampler.metric[:, idx] .= meca.metric[:, idx]
 end
 
@@ -74,35 +84,42 @@ struct MetricFisherDivergence{T<:AbstractFloat} <: AbstractMetricAdapter{T}
     om::OnlineMoments{T}
     og::OnlineMoments{T}
     metric::Matrix{T}
-    alpha::T
 end
 
 function MetricFisherDivergence(
-    initial_metric::AbstractMatrix{T}, args...; metric_smoothing_factor=1 - 8 / 9, kwargs...
+    initial_metric::AbstractMatrix{T}, args...; kwargs...
 ) where {T}
     dims, metrics = size(initial_metric)
     om = OnlineMoments(T, dims, metrics)
     og = OnlineMoments(T, dims, metrics)
-    smoothing_factor = convert(T, metric_smoothing_factor)
-    return MetricFisherDivergence(om, og, initial_metric, smoothing_factor)
+    return MetricFisherDivergence(om, og, copy(initial_metric))
 end
 
 function update!(
-    mfd::MetricFisherDivergence,
+    mfd::MetricFisherDivergence{T},
     x::AbstractMatrix,
-    ldg,
+    ldg!,
     args...;
-    metric_smooth=true,
+    metric_regularize=true,
     kwargs...,
-)
-    grads = similar(x)
-    for c in axes(grads, 2)
-        _, grads[:, c] = ldg(x[:, c]; kwargs...)
+    ) where {T}
+    dims, chains = size(x)
+    grads = [zeros(dims) for chain in 1:chains]
+    for chain in axes(x, 2)
+        ldg!(x[:, chain], grads[chain]; kwargs...)
     end
     update!(mfd.om, x; kwargs...)
-    update!(mfd.og, grads; kwargs...)
-    w = mfd.alpha + (1 - metric_smooth) * (1 - mfd.alpha)
-    mfd.metric .= w .* sqrt.(mfd.om.v ./ mfd.og.v) .+ (1 - w) .* mfd.metric
+    gradients = reduce(hcat, grads)
+    update!(mfd.og, gradients; kwargs...)
+    if mfd.om.n[1] > 2
+        mfd.metric .= sqrt.(mfd.om.v ./ mfd.og.v)
+    end
+    # if metric_regularize
+    #     w = reshape(convert.(T, mfd.om.n ./ (mfd.om.n .+ 5)), 1, :)
+    #     mfd.metric .= w .* V .+ (1 .- w) .* convert(T, 1e-3)::T
+    # else
+    #     mfd.metric .= V
+    # end
 end
 
 function reset!(mfd::MetricFisherDivergence, args...; kwargs...)

@@ -1,5 +1,5 @@
 struct Adam{T<:AbstractFloat}
-    decaysteps::Int
+    decaysteps::Vector{Int}
     m::Vector{T}
     v::Vector{T}
     α::T
@@ -21,7 +21,7 @@ function Adam(
     kwargs...,
 )
     return Adam(
-        decaysteps,
+        [decaysteps],
         zeros(T, dims),
         zeros(T, dims),
         convert(T, α)::T,
@@ -33,7 +33,7 @@ function Adam(
 end
 
 function learningrate(adm::Adam, t)
-    frac = min(t, adm.decaysteps) / adm.decaysteps
+    frac = min(t, adm.decaysteps[1]) / adm.decaysteps[1]
     decay = if adm.schedule == :linear
         1 - frac
     elseif adm.schedule == :cosine
@@ -57,7 +57,8 @@ function update!(adm::Adam, g, t; kwargs...)
     # return a .* (adm.m ./ (sqrt.(adm.v) .+ adm.ι) .+ adm.λ .* x)
 end
 
-function reset!(adm::Adam; initial_stepsize=1, kwargs...)
+function reset!(adm::Adam; decay_steps = 1_000, kwargs...)
     adm.m .= 0
     adm.v .= 0
+    adm.decaysteps .= decay_steps
 end

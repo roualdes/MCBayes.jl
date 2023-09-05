@@ -18,7 +18,7 @@ struct NoiseECA{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseECA(initial_noise::AbstractVector{T}; kwargs...) where {T}
-    return NoiseECA(initial_noise, zero(initial_noise))
+    return NoiseECA(copy(initial_noise), copy(initial_noise))
 end
 
 function update!(neca::NoiseECA, damping, args...; kwargs...)
@@ -46,10 +46,10 @@ struct NoiseConstant{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseConstant(initial_noise::AbstractVector; kwargs...)
-    return NoiseConstant(initial_noise, initial_noise)
+    return NoiseConstant(copy(initial_noise), copy(initial_noise))
 end
 
-function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
+# function set!(sampler, nc::NoiseConstant, args...; kwargs...) end
 
 function update!(nc::NoiseConstant, args...; kwargs...) end
 
@@ -61,11 +61,11 @@ struct NoiseMALT{T<:AbstractFloat} <: AbstractNoiseAdapter{T}
 end
 
 function NoiseMALT(initial_noise::AbstractVector; kwargs...)
-    return NoiseMALT(initial_noise, initial_noise)
+    return NoiseMALT(copy(initial_noise), copy(initial_noise))
 end
 
-function update!(nmalt::NoiseMALT, damping, stepsize, args...; kwargs...)
-    nmalt.noise .= exp.(-0.5 .* stepsize .* damping)
+function update!(nmalt::NoiseMALT, damping, stepsize, args...; noise_reduction_factor = 1e-2, kwargs...)
+    nmalt.noise .= max.(0, exp.(-0.5 .* stepsize .* damping) .- noise_reduction_factor)
     nmalt.noise_bar .= nmalt.noise
 end
 
@@ -73,6 +73,11 @@ end
 function reset!(nmalt::NoiseMALT, args...; kwargs...)
     nmalt.noise .= 0
     nmalt.noise_bar .= 0
+end
+
+function reset!(nmalt::NoiseMALT, damping, stepsize, args...; noise_reduction_factor = 1e-2, kwargs...)
+    nmalt.noise .= exp.(-2 .* damping .* stepsize) .- noise_reduction_factor
+    nmalt.noise_bar .= nmalt.noise
 end
 
 function set!(sampler, nmalt::NoiseMALT, args...; kwargs...)

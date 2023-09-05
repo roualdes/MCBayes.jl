@@ -21,6 +21,12 @@ function set!(sampler, tla::AbstractTrajectorylengthAdapter, args...; kwargs...)
     end
 end
 
+function reset!(tla::AbstractTrajectorylengthAdapter, stepsize, decay_steps, args...; kwargs...)
+    tla.trajectorylength[1] = stepsize
+    tla.trajectorylength_bar[1] = stepsize
+    reset!(tla.adam; decay_steps = decay_steps, kwargs...)
+end
+
 function update!(
     tla::AbstractTrajectorylengthAdapter,
     m,
@@ -31,18 +37,27 @@ function update!(
     qs,
     stepsize,
     r,
-    ldg,
+    ldg!,
     args...;
-    γ=-0.6, # TODO replace by aw below, or needs to be renamed
     kwargs...,
-)
+    )
+
+
+    if any(isnan.(qs))
+        println("proposed states $(qs)")
+    end
+
     update!(tla.omstates, positions; kwargs...)
     update!(tla.omproposals, qs; kwargs...)
+
     ghats = trajectorylength_gradient(
-        tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg
+        tla, m, αs, positions, previousps, ps, qs, stepsize, r, ldg!
     )
 
     for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
+        if isnan(gi)
+            ghats[i] = 0
+        end
         if !isfinite(gi) || ai < 1e-4
             αs[i] = 1e-20
         end
@@ -73,7 +88,7 @@ function trajectorylength_gradient(
     qs,
     stepsize,
     r,
-    ldg,
+    ldg!,
 )
     dims, chains = size(positions)
 
@@ -95,7 +110,7 @@ function trajectorylength_gradient(
     @. meanq = mw * tla.omproposals.m + (1 - mw) * meanq
 
     ghats = sampler_trajectorylength_gradient(
-        tla, m, positions, previousps, ps, qs, stepsize, meanθ, meanq, r, ldg
+        tla, m, positions, previousps, ps, qs, stepsize, meanθ, meanq, r, ldg!
     )
     return ghats
 end
@@ -130,7 +145,7 @@ function TrajectorylengthChEES(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthChEES, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthChEES, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     h = halton(m)
@@ -138,6 +153,10 @@ function sampler_trajectorylength_gradient(
     dims, chains = size(positions)
     ghats = zeros(chains)
     @views for chain in 1:chains
+        if any(isnan.(ps[:, chain]))
+            ghats[chain] = 1e-20
+            continue
+        end
         q = qs[:, chain]
         dsq = centered_sum(abs2, q, mq) - centered_sum(abs2, positions[:, chain], mθ)
         fd = dsq * centered_dot(q, mq, ps[:, chain])
@@ -178,7 +197,7 @@ function TrajectorylengthMALT(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthMALT, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthMALT, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     T = eltype(positions)
@@ -215,18 +234,18 @@ function TrajectorylengthSNAPER(
     adam = Adam(1, warmup, T; α=0.01, kwargs...)
     omstates = OnlineMoments(T, dims, 1)
     omproposals = OnlineMoments(T, dims, 1)
-    return TrajectorylengthMALT(
+    return TrajectorylengthSNAPER(
         adam,
         omstates,
         omproposals,
-        initial_trajectorylength,
-        initial_trajectorylength,
+        copy(initial_trajectorylength),
+        copy(initial_trajectorylength),
         maxleapfrogsteps,
     )
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthSNAPER, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthSNAPER, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
     h = halton(m)
@@ -277,17 +296,19 @@ function TrajectorylengthLDG(
 end
 
 function sampler_trajectorylength_gradient(
-    tlc::TrajectorylengthLDG, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg
+    tlc::TrajectorylengthLDG, m, positions, previousps, ps, qs, stepsize, mθ, mq, r, ldg!
 )
     t = tlc.trajectorylength[1] + stepsize
-    h = halton(m)
+    h = 1 # halton(m)
     T = eltype(positions)
     dims, chains = size(positions)
     ghats = zeros(chains)
+    gradientq = zeros(dims)
+    gradientpos = zeros(dims)
     @views for chain in 1:chains
         q = qs[:, chain]
-        ldq, gradientq = ldg(q)
-        ldp, gradientpos = ldg(positions[:, chain])
+        ldq = ldg!(q, gradientq)
+        ldp = ldg!(positions[:, chain], gradientpos)
         dsq = ldq^2 - ldp^2
         fd = dsq * dot(gradientq, ps[:, chain])
         fd2 = -dsq * dot(gradientpos, previousps[:, chain])
@@ -296,6 +317,89 @@ function sampler_trajectorylength_gradient(
     end
     return ghats
 end
+
+
+struct TrajectorylengthDualAverageLDG{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    da::DualAverage{T}
+    trajectorylength::Vector{T}
+end
+
+
+function TrajectorylengthDualAverageLDG(
+    stepsize::AbstractVector{T};
+    kwargs...,
+    ) where {T}
+    return TrajectorylengthDualAverageLDG(
+        DualAverage(1, T; kwargs...),
+        copy(stepsize),
+    )
+end
+
+function update!(
+    tla::TrajectorylengthDualAverageLDG,
+    m,
+    αs,
+    previouspositions,
+    proposedpositions,
+    proposedmomentum,
+    stepsize,
+    ldg!,
+    args...;
+    kwargs...,
+)
+
+    ghats = sampler_trajectorylength_gradient(
+        tla, m, previouspositions, proposedpositions, proposedmomentum, stepsize, ldg!
+    )
+
+    # acceptance probability weighted mean of chains' gradients => ghat
+    T = eltype(previouspositions)
+    a = zero(T)
+    ghat = zero(T)
+    for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
+        if !isfinite(gi) || ai < 1e-4
+            ai = 1e-20
+        end
+        a += ai
+        ghat += ai * (gi - ghat) / a
+    end
+
+    tla.trajectorylength .= update!(tla.da, ghat; kwargs...)
+    # TODO necessary? prefer to skip: logupdate = clamp(as, -0.35, 0.35)           # [3]#L759
+end
+
+function sampler_trajectorylength_gradient(
+    tla::TrajectorylengthDualAverageLDG, m, previouspositions, proposedpositions, proposedmomentum, stepsize, ldg!
+    )
+
+    T = eltype(previouspositions)
+    dims, chains = size(previouspositions)
+
+    τ = tla.trajectorylength[1] + mean(stepsize)
+    h = halton(m)
+    ghats = zeros(chains)
+    gradient_previous = zeros(dims)
+    gradient_proposed = zeros(dims)
+
+    @views for chain in 1:chains
+        previous = previouspositions[:, chain]
+        ld_previous = ldg!(previous, gradient_previous)
+
+        proposed = proposedpositions[:, chain]
+        ld_proposed = ldg!(proposed, gradient_proposed)
+
+        d = (ld_proposed ^ 2 - ld_previous ^ 2)
+        dg = d * dot(gradient_proposed, proposedmomentum[:, chain])
+        ghats[chain] = 2 * dg - d ^ 2 / τ
+        ghats[chain] *= h
+    end
+    return ghats
+end
+
+function reset!(tla::TrajectorylengthDualAverageLDG, args...; kwargs...)
+    reset!(tla.da; kwargs...)
+end
+
 
 struct TrajectorylengthConstant{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
     trajectorylength::Vector{T}
@@ -309,3 +413,148 @@ end
 function update!(tlc::TrajectorylengthConstant, args...; kwargs...) end
 
 function reset!(tlc::TrajectorylengthConstant, args...; kwargs...) end
+
+
+struct AdamSNAPER{T<:AbstractFloat} <: AbstractTrajectorylengthAdapter{T}
+    adam::Adam{T}
+    mpositions::Vector{T}
+    mproposals::Vector{T}
+    N::Vector{Int}
+    trajectorylength::Vector{T}
+    trajectorylength_bar::Vector{T}
+    maxleapfrogsteps::Int
+    alpha::T
+end
+
+function AdamSNAPER(
+    initial_trajectorylength::AbstractVector{T},
+    dims,
+    warmup;
+    maxleapfrogsteps=1000,
+    dualaverage_snaper_smooth_factor = 1 - 8/9,
+    kwargs...,
+) where {T}
+    adam = Adam(1, warmup, T; μ = 0, kwargs...)
+    return AdamSNAPER(
+        adam,
+        zeros(T, dims),
+        zeros(T, dims),
+        ones(Int, 1),
+        copy(initial_trajectorylength),
+        copy(initial_trajectorylength),
+        maxleapfrogsteps,
+        convert(T, dualaverage_snaper_smooth_factor)::T
+    )
+end
+
+function update!(
+    das::AdamSNAPER,
+    m,
+    αs,
+    previous_positions,
+    previous_momentum,
+    proposed_momentum,
+    proposed_positions,
+    stepsize,
+    pca,
+    args...;
+    kwargs...,
+    )
+
+    T = eltype(previous_positions)
+    dims, chains = size(previous_positions)
+
+    v = zero(T)
+    mean_positions = zeros(T, dims)
+    mean_proposals = zeros(T, dims)
+
+    @views for chain in 1:chains
+        @. mean_positions += (previous_positions[:, chain] - mean_positions) / chain
+        a = αs[chain]
+        v += a
+        if !all(isnan.(proposed_positions[:, chain]))
+            @. mean_proposals += a * (proposed_positions[:, chain] - mean_proposals) / v
+        end
+    end
+
+    N = das.N[1]
+    mw = N / (N + chains)
+
+    @. das.mpositions = mw * das.mpositions + (1 - mw) * mean_positions
+    if !all(isnan.(mean_proposals))
+        @. das.mproposals = mw * das.mproposals + (1 - mw) * mean_proposals
+    end
+
+
+    ghats = sampler_trajectorylength_gradient(
+        das,
+        m,
+        previous_positions,
+        proposed_positions,
+        previous_momentum,
+        proposed_momentum,
+        stepsize,
+        pca
+    )
+
+    for (i, (ai, gi)) in enumerate(zip(αs, ghats)) # [7]#L214
+        if isnan(gi) || !isfinite(gi)
+            ghats[i] = 0
+            αs[i] = 1e-20
+        end
+        # if !isfinite(gi) || ai < 1e-4
+        #     αs[i] = 1e-20
+        # end
+    end
+
+    ghat = weighted_mean(ghats, αs)
+    as = update!(das.adam, ghat, m; kwargs...)[1]
+
+    #logupdate = clamp(as, -0.35, 0.35)           # [3]#L759
+    T = das.trajectorylength[1] * exp(as)             # [3]#L761
+    T = min(T, stepsize * das.maxleapfrogsteps) # [3]#L773
+
+    das.trajectorylength_bar[1] = exp(
+        das.alpha * log(T) + (1 - das.alpha) * log(1e-10 + das.trajectorylength_bar[1])
+    )
+
+    maxtrajectorylength = stepsize * das.maxleapfrogsteps
+    das.trajectorylength .= min.(T, maxtrajectorylength)
+    das.trajectorylength_bar .= min.(das.trajectorylength_bar, maxtrajectorylength)
+end
+
+function sampler_trajectorylength_gradient(
+    das::AdamSNAPER, m, previous_positions, proposed_positions, previous_momentum, proposed_momentum, stepsize, pca
+    )
+    τ = das.trajectorylength[1] + stepsize
+    T = eltype(previous_positions)
+    _, chains = size(previous_positions)
+    mq = das.mproposals
+    mθ = das.mpositions
+    ghats = Vector{T}(undef, chains)
+    @views for chain in 1:chains
+        # CHEES
+        # proposed = centered_sum(abs2, proposed_positions[:, chain], mq)
+        # previous = centered_sum(abs2, previous_positions[:, chain], mθ)
+        # dsq = proposed - previous
+        # rho_proposed = dsq * centered_dot(proposed_positions[:, chain], mq, proposed_momentum[:, chain])
+        # rho_previous = -dsq * centered_dot(previous_positions[:, chain], mq, -previous_momentum[:, chain])
+        # SNAPER
+        proposed_pca = centered_dot(proposed_positions[:, chain], mq, pca)
+        previous_pca = centered_dot(previous_positions[:, chain], mθ, pca)
+        dsq = proposed_pca ^ 2 - previous_pca ^ 2
+        rho_proposed = dsq * proposed_pca * dot(proposed_momentum[:, chain], pca)
+        rho_previous = -dsq * previous_pca * dot(-previous_momentum[:, chain], pca)
+        ghats[chain] = 2 * (rho_proposed + rho_previous) / τ - (dsq / τ) ^ 2
+    end
+    return ghats
+end
+
+function reset!(das::AdamSNAPER, stepsize, args...; kwargs...)
+    reset!(das.adam; kwargs...)
+    das.trajectorylength[1] = stepsize
+    das.trajectorylength_bar[1] = stepsize
+    das.mpositions .= 0
+    das.mproposals .= 0
+    das.N .= 1
+end

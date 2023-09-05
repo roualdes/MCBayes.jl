@@ -14,13 +14,15 @@ include("adam.jl")
 include("onlinemoments.jl")
 include("onlinepca.jl")
 
-include("stepsize_adapter.jl")
 include("trajectorylength_adapter.jl")
+include("stepsize_adapter.jl")
 include("metric_adapter.jl")
 include("pca_adapter.jl")
 include("damping_adapter.jl")
 include("drift_adapter.jl")
 include("noise_adapter.jl")
+include("steps_adapter.jl")
+include("reductionfactor_adapter.jl")
 
 include("sampler_initializer.jl")
 include("draws_initializer.jl")
@@ -32,6 +34,10 @@ include("meads.jl")
 include("mala.jl")
 include("malt.jl")
 include("sga.jl")
+include("xhmc.jl")
+include("drmala.jl")
+include("drghmc.jl")
+include("drhmc.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -47,6 +53,10 @@ export Stan,
     MALT,
     ChEES,
     SNAPER,
+    XHMC,
+    DrMALA,
+    DRGHMC,
+    DRHMC,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
@@ -72,6 +82,7 @@ export Stan,
     TrajectorylengthConstant,
     TrajectorylengthChEES,
     TrajectorylengthSNAPER,
+    DualAverageSNAPER,
     TrajectorylengthLDG,
     DampingECA,
     DampingMALT,
@@ -81,6 +92,11 @@ export Stan,
     NoiseECA,
     NoiseMALT,
     NoiseConstant,
+    StepsPCA,
+    StepsDualAverageSNAPER,
+    StepsConstant,
+    ReductionFactorDualAverage,
+    ReductionFactorConstant,
     sample!,
     # ess_bulk, # TODO wait until https://github.com/JuliaLang/julia/pull/47040
     ess_tail,
@@ -110,9 +126,16 @@ function run_sampler!(
         rand(1:typemax(Int), hasfield(typeof(sampler), :chains) ? sampler.chains : 4)
     ),
     draws_initializer=DrawsInitializer(),
+    draws_reinitializer=DrawsInitializerNoop(),
     stepsize_initializer=StepsizeInitializer(),
     stepsize_adapter=StepsizeConstant(
         hasfield(typeof(sampler), :stepsize) ? sampler.stepsize : ones(1)
+    ),
+    steps_adapter=StepsConstant(
+        hasfield(typeof(sampler), :steps) ? sampler.steps : ones(Int, sampler.chains)
+    ),
+    reductionfactor_adapter=ReductionFactorConstant(
+      hasfield(typeof(sampler), :reductionfactor) ? sampler.reductionfactor : ones(1)
     ),
     trajectorylength_adapter=TrajectorylengthConstant(
         hasfield(typeof(sampler), :trajectorylength) ? sampler.trajectorylength : ones(1)
@@ -120,7 +143,7 @@ function run_sampler!(
     metric_adapter=MetricConstant(
         hasfield(typeof(sampler), :metric) ? sampler.metric : ones(1)
     ),
-    pca_adapter=PCAConstant(hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1)),
+    pca_adapter=PCAConstant(hasfield(typeof(sampler), :pca) ? sampler.pca : zeros(1, 1)),
     damping_adapter=DampingConstant(
         hasfield(typeof(sampler), :damping) ? sampler.damping : zeros(1)
     ),
@@ -159,8 +182,10 @@ function run_sampler!(
         kwargs...,
     )
 
+    initialize_draws!(draws_reinitializer, draws, rngs, ldg, sampler.stepsize[1]; kwargs...)
+
     for m in 1:M
-        transition!(sampler, m, ldg, draws, rngs, diagnostics; kwargs...)
+        transition!(sampler, m, ldg, draws, rngs, diagnostics; warmup, kwargs...)
 
         # TODO adaptations effectively should be unique to each algorithm
         # adaptation schedules don't generalize well
@@ -176,6 +201,8 @@ function run_sampler!(
             pca_adapter,
             stepsize_initializer,
             stepsize_adapter,
+            reductionfactor_adapter,
+            steps_adapter,
             trajectorylength_adapter,
             damping_adapter,
             noise_adapter,
@@ -187,22 +214,23 @@ function run_sampler!(
 end
 
 # precompile
-function ldg(x; kwargs...)
-    -x' * x / 2, -x
+function ldg!(x, gradient; kwargs...)
+    gradient .= -x
+    return -x' * x / 2
 end
 
 stan = Stan(10)
-draws, diagnostics, rngs = sample!(stan, ldg)
+draws, diagnostics, rngs = sample!(stan, ldg!)
 ess_mean(draws)
 rhat_basic(draws)
 
 meads = MEADS(10)
-draws, diagnostics, rngs = sample!(meads, ldg)
+draws, diagnostics, rngs = sample!(meads, ldg!)
 
 mala = MALA(10)
-draws, diagnostics, rngs = sample!(mala, ldg)
+draws, diagnostics, rngs = sample!(mala, ldg!)
 
 chees = ChEES(10)
-draws, diagnostics, rngs = sample!(chees, ldg)
+draws, diagnostics, rngs = sample!(chees, ldg!)
 
 end
