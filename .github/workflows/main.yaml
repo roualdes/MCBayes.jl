@@ -12,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out github
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Check out BridgeStan
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: roualdes/bridgestan
           submodules: recursive
