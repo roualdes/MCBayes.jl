@@ -150,8 +150,8 @@ function get_num(
     qj = similar(position)
     pj = similar(momentum)
 
-    if J > 1
-        for j in 0:(J - 1)
+    if J > 0
+        for j in 0:J-1
             qj .= position
             ld = ldg!(qj, gradient; kwargs...)
             pj .= momentum
@@ -202,7 +202,6 @@ function get_num(
             end
         end
     end
-
     return (; num=prod(1 .- avec) * prod(ptries),
             divergent, leapfrog)
 end

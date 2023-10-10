@@ -89,8 +89,8 @@ function transition!(sampler::DRHMC, m, ldg!, draws, rngs, trace;
     stepsize = sampler.stepsize[1]
     steps = ceil(Int, rand() * sampler.steps[1])
 
-    # println("iteration $m")
-    # println("steps = $(sampler.steps)")
+    println("iteration $m")
+    println("steps = $(sampler.steps)")
     # println("stepsize = $(sampler.stepsize)")
     # println("reduction factor = $(sampler.reductionfactor)")
 
@@ -123,7 +123,7 @@ function transition!(sampler::DRHMC, m, ldg!, draws, rngs, trace;
                 1,
                 sampler.acceptanceprob[chain:chain],
                 J,
-                2, # reduction_factor,
+                4, # reduction_factor,
                 nru,
                 1000;
                 kwargs...,
@@ -188,7 +188,7 @@ function adapt!(
                     trace.previousmomentum,
                     trace.proposedp,
                     # sampler.stepsize[1],
-                    trace.stepsize[m + 1, :], # effectively stepsize / reduction_factor
+                    mean(trace.stepsize[m + 1, :]), # effectively stepsize / reduction_factor
                     sampler.pca ./ mapslices(norm, sampler.pca, dims = 1),
                     ldg!;
                     kwargs...)
