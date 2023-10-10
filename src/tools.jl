@@ -364,12 +364,12 @@ function hmc!(
     end
 
     return (;
-        accepted,
-        divergent,
-        stepsize,
-        steps,
-        ld,
-        acceptstat=a,
+            accepted,
+            divergent,
+            stepsize,
+            steps,
+            ld,
+            acceptstat=a,
             energy=H,
             previousmomentum=momentum,
             proposedp=p,

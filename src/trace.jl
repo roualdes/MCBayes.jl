@@ -374,3 +374,57 @@ function record!(sampler::DRHMC{T}, trace::NamedTuple, info, iteration, chain) w
     trace[:retries][info[:retries], iteration, chain] += 1
     trace[:firsttry][iteration, chain] = info[:firsttry]
 end
+
+function trace(sampler::DHMC{T}, iterations) where {T}
+    chains = sampler.chains
+    dims = sampler.dims
+    return (;
+            accepted=zeros(Bool, iterations, chains),
+            acceptstat=zeros(T, iterations, chains),
+            divergence=zeros(Bool, iterations, chains),
+            energy=zeros(T, iterations, chains),
+            stepsize=zeros(T, iterations, chains),
+            leapfrog=zeros(Int, iterations, chains),
+            treedepth=zeros(Int, iterations, chains),
+            steps=zeros(Int, iterations, chains),
+            ld=zeros(T, iterations, chains),
+            retries=zeros(Int, 3, iterations, chains),
+            reductionfactor=zeros(T, iterations),
+            proposedq=zeros(T, dims, chains),
+            proposedp=zeros(T, dims, chains),
+            previousmomentum=zeros(T, dims, chains),
+            pca = zeros(T, iterations, dims)
+    )
+end
+
+function record!(sampler::DHMC{T}, trace::NamedTuple, info, iteration, chain) where {T}
+    keys = (
+        :stepsize,
+        :accepted,
+        :acceptstat,
+        :divergence,
+        :energy,
+        :ld,
+        :leapfrog,
+        :treedepth,
+    )
+
+    for k in keys
+        if haskey(info, k)
+            trace[k][iteration, chain] = info[k]
+        end
+    end
+
+    trace[:pca][iteration, :] .= info.pca
+    D = size(trace[:proposedq], 1)
+    trace[:proposedq][:, chain] .= get(info, :proposedq, randn(D))
+    # trace[:previousmomentum][:, chain] .= trace[:nextmomentum][:, chain]
+    trace[:previousmomentum][:, chain] .= get(info, :previousmomentum, randn(D))
+    # trace[:proposedq][:, chain] .= info[:proposedq]
+    trace[:proposedp][:, chain] .= get(info, :proposedp, randn(D))
+    # trace[:reductionfactor][iteration] = info[:reduction_factor]
+    # # trace[:noise][iteration, chain] = info[:noise]
+    # # trace[:damping][iteration, :, chain] .= info[:damping]
+    # trace[:retries][info[:retries], iteration, chain] += 1
+    # trace[:firsttry][iteration, chain] = info[:firsttry]
+end

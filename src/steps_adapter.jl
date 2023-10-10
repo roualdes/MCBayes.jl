@@ -64,6 +64,7 @@ function update!(sa::StepsAdamSNAPER, m, αs, previous_positions, proposed_posit
     update!(sa.das, m, αs, previous_positions, previous_momentum, proposed_momentum, proposed_positions, stepsize, pca, ldg!; kwargs...)
 
     τ = optimum(sa.das; kwargs...)[1]
+    println("estimated trajectorylength = $τ")
     step = τ / stepsize
     step = ifelse(isfinite(step), step, 10)
     w = 1 / m

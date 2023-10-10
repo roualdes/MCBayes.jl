@@ -43,7 +43,6 @@ function update!(
         ) where {T}
     update!(pca.opca, x, location, scale; kwargs...)
     pca.pc .= pca.opca.pc
-    pca.pc .= pca.opca.pc
     pca.pc_bar .= pca.alpha .* pca.pc .+ (1 - pca.alpha) .* pca.pc_bar
 end
 

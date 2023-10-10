@@ -24,7 +24,7 @@ function Stan(
     metric=ones(T, dims, chains),
     stepsize=ones(T, chains),
     maxtreedepth=10,
-    maxdeltaH=convert(T, 1000),
+    maxdeltaH=convert(T, 1000)::T,
 )
     D = convert(Int, dims)::Int
     return Stan(metric, stepsize, D, chains, maxtreedepth, maxdeltaH)

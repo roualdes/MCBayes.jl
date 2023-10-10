@@ -38,6 +38,7 @@ include("xhmc.jl")
 include("drmala.jl")
 include("drghmc.jl")
 include("drhmc.jl")
+include("dhmc.jl")
 
 include("tools.jl")
 include("integrator.jl")
@@ -57,6 +58,7 @@ export Stan,
     DrMALA,
     DRGHMC,
     DRHMC,
+    DHMC,
     WindowedAdaptationSchedule,
     NoAdaptationSchedule,
     SGAAdaptationSchedule,
@@ -185,7 +187,7 @@ function run_sampler!(
     initialize_draws!(draws_reinitializer, draws, rngs, ldg, sampler.stepsize[1]; kwargs...)
 
     for m in 1:M
-        transition!(sampler, m, ldg, draws, rngs, diagnostics; warmup, kwargs...)
+        transition!(sampler, m, ldg, draws, rngs, diagnostics; adaptation_schedule, warmup, kwargs...)
 
         # TODO adaptations effectively should be unique to each algorithm
         # adaptation schedules don't generalize well

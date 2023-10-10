@@ -1,6 +1,6 @@
 mutable struct WindowedAdaptationSchedule
     closewindow::Int
-    beyondfirstclosewindow::Bool
+    startHMC::Bool
     previousclosewindow::Int
     windowsize::Int
     const warmup::Int
@@ -16,14 +16,16 @@ function WindowedAdaptationSchedule(warmup; initbuffer=75, termbuffer=100, windo
 end
 
 function calculate_nextwindow!(ws::WindowedAdaptationSchedule)
-    ws.beyondfirstclosewindow = true
     ws.windowsize *= 2
     nextclosewindow = ws.closewindow + ws.windowsize
     ws.previousclosewindow = ws.closewindow
-    ws.closewindow = if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
-        ws.lastwindow
+    if ws.closewindow + 2 * ws.windowsize > ws.lastwindow
+        ws.closewindow = ws.lastwindow
     else
-        min(nextclosewindow, ws.lastwindow)
+        ws.closewindow = min(nextclosewindow, ws.lastwindow)
+        if nextclosewindow + 4 * ws.windowsize > ws.lastwindow
+            ws.startHMC = true
+        end
     end
 end
 

@@ -464,26 +464,26 @@ function update!(
     T = eltype(previous_positions)
     dims, chains = size(previous_positions)
 
-    v = zero(T)
-    mean_positions = zeros(T, dims)
-    mean_proposals = zeros(T, dims)
+    # v = zero(T)
+    # mean_positions = zeros(T, dims)
+    # mean_proposals = zeros(T, dims)
 
-    @views for chain in 1:chains
-        @. mean_positions += (previous_positions[:, chain] - mean_positions) / chain
-        a = αs[chain]
-        v += a
-        if !all(isnan.(proposed_positions[:, chain]))
-            @. mean_proposals += a * (proposed_positions[:, chain] - mean_proposals) / v
-        end
-    end
+    # @views for chain in 1:chains
+    #     @. mean_positions += (previous_positions[:, chain] - mean_positions) / chain
+    #     a = αs[chain]
+    #     v += a
+    #     if !all(isnan.(proposed_positions[:, chain]))
+    #         @. mean_proposals += a * (proposed_positions[:, chain] - mean_proposals) / v
+    #     end
+    # end
 
-    N = das.N[1]
-    mw = N / (N + chains)
+    # N = das.N[1]
+    # mw = N / (N + chains)
 
-    @. das.mpositions = mw * das.mpositions + (1 - mw) * mean_positions
-    if !all(isnan.(mean_proposals))
-        @. das.mproposals = mw * das.mproposals + (1 - mw) * mean_proposals
-    end
+    # @. das.mpositions = mw * das.mpositions + (1 - mw) * mean_positions
+    # if !all(isnan.(mean_proposals))
+    #     @. das.mproposals = mw * das.mproposals + (1 - mw) * mean_proposals
+    # end
 
 
     ghats = sampler_trajectorylength_gradient(
@@ -529,8 +529,8 @@ function sampler_trajectorylength_gradient(
     τ = das.trajectorylength[1] + stepsize
     T = eltype(previous_positions)
     _, chains = size(previous_positions)
-    mq = das.mproposals
-    mθ = das.mpositions
+    # mq = das.mproposals
+    # mθ = das.mpositions
     ghats = Vector{T}(undef, chains)
     @views for chain in 1:chains
         # CHEES
@@ -540,8 +540,10 @@ function sampler_trajectorylength_gradient(
         # rho_proposed = dsq * centered_dot(proposed_positions[:, chain], mq, proposed_momentum[:, chain])
         # rho_previous = -dsq * centered_dot(previous_positions[:, chain], mq, -previous_momentum[:, chain])
         # SNAPER
-        proposed_pca = centered_dot(proposed_positions[:, chain], mq, pca)
-        previous_pca = centered_dot(previous_positions[:, chain], mθ, pca)
+        # proposed_pca = centered_dot(proposed_positions[:, chain], mq, pca)
+        # previous_pca = centered_dot(previous_positions[:, chain], mθ, pca)
+        proposed_pca = proposed_positions[:, chain]' * pca
+        previous_pca = previous_positions[:, chain]' * pca
         dsq = proposed_pca ^ 2 - previous_pca ^ 2
         rho_proposed = dsq * proposed_pca * dot(proposed_momentum[:, chain], pca)
         rho_previous = -dsq * previous_pca * dot(-previous_momentum[:, chain], pca)
